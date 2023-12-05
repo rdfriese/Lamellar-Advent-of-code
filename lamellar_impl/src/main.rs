@@ -40,15 +40,12 @@ fn main() {
     // day3::part_2(&world);
     // println!("time: {:?}", start.elapsed());
 
-    // let start = std::time::Instant::now();
-    // day4::part_1(&world);
-    // println!("time: {:?}", start.elapsed());
-    // let start = std::time::Instant::now();
-    // day4::part_2(&world);
-    // println!("time: {:?}", start.elapsed());
-    // let start = std::time::Instant::now();
-    // day4::part_2_v2(&world);
-    // println!("time: {:?}", start.elapsed());
+    let start = std::time::Instant::now();
+    day4::part_1(&world);
+    println!("time: {:?}", start.elapsed());
+    let start = std::time::Instant::now();
+    day4::part_2_slow(&world);
+    println!("time: {:?}", start.elapsed());
     let start = std::time::Instant::now();
     day4::part_2_fast(&world);
     println!("time: {:?}", start.elapsed());

@@ -853,8 +853,6 @@ dependencies = [
 [[package]]
 name = "lamellar"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf00f7821de6a0422c8e8ed3e210c62addcc3f9a055a9e35b7f8747df3f35964"
 dependencies = [
  "anyhow",
  "async-lock 2.8.0",
@@ -899,8 +897,6 @@ dependencies = [
 [[package]]
 name = "lamellar-impl"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d22f57c80f9bae48d32da552c9b7144b13e5d1ec544092b0bb10efa7a39737c"
 dependencies = [
  "async-trait",
  "futures",

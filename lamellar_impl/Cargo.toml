@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.29"
-lamellar = "0.6.0"
+#lamellar = "0.6.0"
+lamellar = {path = "../../lamellar-runtime-junction"}
