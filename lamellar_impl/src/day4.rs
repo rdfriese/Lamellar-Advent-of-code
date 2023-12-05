@@ -98,7 +98,7 @@ impl LamellarAm for Part2V2 {
     }
 }
 
-#[AmLocalData(Debug)]
+#[AmData(Debug)]
 struct Part2V3 {
     games: Darc<Vec<String>>,
     line: usize,
@@ -106,7 +106,7 @@ struct Part2V3 {
     cards: Darc<Mutex<HashMap<usize, usize>>>,
 }
 
-#[local_am]
+#[am]
 impl LamellarAm for Part2V3 {
     async fn exec() {
         let mut my_cards = HashMap::new();
