@@ -2,7 +2,7 @@ use lamellar::active_messaging::prelude::*;
 
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Seek, SeekFrom},
+    io::{BufRead, BufReader},
 };
 
 #[AmData(Debug)]
