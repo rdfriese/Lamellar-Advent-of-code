@@ -1,18 +1,14 @@
 use lamellar::active_messaging::prelude::*;
-// use lamellar::darc::prelude::*;
+use lamellar::darc::prelude::*;
 
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     str,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 fn check_left(line: &[u8], i: usize) -> u32 {
-    // println!("\tcheck left {i}");
     let mut start_i = i;
     while start_i > 0 {
         if !(line[start_i - 1] as char).is_numeric() {
@@ -20,7 +16,6 @@ fn check_left(line: &[u8], i: usize) -> u32 {
         }
         start_i -= 1;
     }
-    // println!("\t{start_i}-{i} {:?}", str::from_utf8(&line[start_i..i]));
     str::from_utf8(&line[start_i..i])
         .expect("only ascii")
         .parse::<u32>()
@@ -28,7 +23,6 @@ fn check_left(line: &[u8], i: usize) -> u32 {
 }
 
 fn check_right(line: &[u8], i: usize) -> u32 {
-    // println!("\tcheck right {i}");
     let mut end_i = i;
     while end_i < line.len() - 1 {
         if !(line[end_i + 1] as char).is_numeric() {
@@ -36,7 +30,6 @@ fn check_right(line: &[u8], i: usize) -> u32 {
         }
         end_i += 1;
     }
-    // println!("\t{i}-{end_i} {:?}", str::from_utf8(&line[i + 1..=end_i]));
     str::from_utf8(&line[i + 1..=end_i])
         .expect("only ascii")
         .parse::<u32>()
@@ -46,7 +39,6 @@ fn check_right(line: &[u8], i: usize) -> u32 {
 
 // this is when we are checking above or below
 fn check_center(line: &[u8], i: usize) -> (u32, u32) {
-    // println!("\tcheck center {i}");
     if !(line[i] as char).is_numeric() {
         //not one long number so check left and right diagonals
         return (check_left(line, i), check_right(line, i));
@@ -65,10 +57,6 @@ fn check_center(line: &[u8], i: usize) -> (u32, u32) {
             }
             end_i += 1;
         }
-        // println!(
-        //     "\t{start_i}-{end_i} {:?}",
-        //     str::from_utf8(&line[start_i..=end_i])
-        // );
         (
             str::from_utf8(&line[start_i..=end_i])
                 .expect("only ascii")
@@ -80,11 +68,13 @@ fn check_center(line: &[u8], i: usize) -> (u32, u32) {
     }
 }
 
+// we can also create active messages that only execute locally
 #[AmLocalData(Debug)]
 struct Part1 {
-    schematic: Arc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
+    // a darc is lamellar construct for a "distributed Arc"
+    schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
     line: usize,
-    sum: Arc<AtomicU32>,
+    sum: Darc<AtomicU32>,
 }
 
 #[local_am]
@@ -118,9 +108,9 @@ impl LamellarAm for Part1 {
 
 #[AmLocalData(Debug)]
 struct Part2 {
-    schematic: Arc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
+    schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
     line: usize,
-    sum: Arc<AtomicU32>,
+    sum: Darc<AtomicU32>,
 }
 
 #[local_am]
@@ -174,14 +164,16 @@ impl LamellarAm for Part2 {
 
 pub fn part_1(world: &LamellarWorld) {
     let f = File::open("inputs/day3.txt").unwrap();
-    let schematic = Arc::new(
+    let schematic = Darc::new(
+        world,
         BufReader::new(&f)
             .lines()
             .into_iter()
             .map(|line| line.expect("line exists").into_bytes())
             .collect::<Vec<_>>(),
-    );
-    let sum = Arc::new(AtomicU32::new(0));
+    )
+    .unwrap();
+    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
     for i in 0..schematic.len() {
         world.exec_am_local(Part1 {
             schematic: schematic.clone(),
@@ -195,14 +187,16 @@ pub fn part_1(world: &LamellarWorld) {
 
 pub fn part_2(world: &LamellarWorld) {
     let f = File::open("inputs/day3.txt").unwrap();
-    let schematic = Arc::new(
+    let schematic = Darc::new(
+        world,
         BufReader::new(&f)
             .lines()
             .into_iter()
             .map(|line| line.expect("line exists").into_bytes())
             .collect::<Vec<_>>(),
-    );
-    let sum = Arc::new(AtomicU32::new(0));
+    )
+    .unwrap();
+    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
     for i in 0..schematic.len() {
         world.exec_am_local(Part2 {
             schematic: schematic.clone(),

@@ -50,6 +50,9 @@ fn main() {
     day4::part_2_v2(&world);
     println!("time: {:?}", start.elapsed());
     let start = std::time::Instant::now();
+    day4::part_2_v3(&world);
+    println!("time: {:?}", start.elapsed());
+    let start = std::time::Instant::now();
     day4::part_2_serial(&world);
     println!("time: {:?}", start.elapsed());
 }

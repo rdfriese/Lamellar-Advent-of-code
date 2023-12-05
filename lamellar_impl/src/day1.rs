@@ -30,7 +30,7 @@ impl LamellarAm for Part1 {
     }
 }
 
-const digits: [&str; 9] = [
+const DIGITS: [&str; 9] = [
     "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
 
@@ -53,7 +53,7 @@ impl LamellarAm for Part2 {
             .next();
 
         let mut min_i = idx;
-        for (i, digit) in digits.iter().enumerate() {
+        for (i, digit) in DIGITS.iter().enumerate() {
             if let Some(f) = self.line[..=idx].find(digit) {
                 if f < min_i {
                     min_i = f;
@@ -75,7 +75,7 @@ impl LamellarAm for Part2 {
             idx = 0;
         }
         let mut max_i = 0;
-        for (i, digit) in digits.iter().enumerate() {
+        for (i, digit) in DIGITS.iter().enumerate() {
             if let Some(f) = self.line[idx..].rfind(digit) {
                 if f > max_i {
                     max_i = f;
@@ -123,7 +123,7 @@ pub fn part_1_task_group(world: &LamellarWorld) {
         .block_on(tg.exec())
         .iter()
         .map(|x| {
-            if let AmGroupResult::Pe(pe, val) = x {
+            if let AmGroupResult::Pe(_pe, val) = x {
                 *val
             } else {
                 0
@@ -164,7 +164,7 @@ pub fn part_2_task_group(world: &LamellarWorld) {
         .block_on(tg.exec())
         .iter()
         .map(|x| {
-            if let AmGroupResult::Pe(pe, val) = x {
+            if let AmGroupResult::Pe(_pe, val) = x {
                 *val
             } else {
                 0

@@ -1,5 +1,5 @@
 use lamellar::active_messaging::prelude::*;
-// use lamellar::darc::prelude::*;
+use lamellar::darc::prelude::*;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -33,7 +33,7 @@ fn get_matches<'a>(mut numbers: Split<'a, &str>) -> usize {
 #[AmLocalData(Debug)]
 struct Part1 {
     line: String,
-    sum: Arc<AtomicU32>,
+    sum: Darc<AtomicU32>,
 }
 
 #[local_am]
@@ -50,9 +50,9 @@ impl LamellarAm for Part1 {
 
 #[AmLocalData(Debug)]
 struct Part2 {
-    games: Arc<Vec<String>>,
+    games: Darc<Vec<String>>,
     line: usize,
-    sum: Arc<AtomicU32>,
+    sum: Darc<AtomicU32>,
 }
 
 #[local_am]
@@ -75,9 +75,9 @@ impl LamellarAm for Part2 {
 
 #[AmLocalData(Debug)]
 struct Part2V2 {
-    games: Arc<Vec<String>>,
+    games: Darc<Vec<String>>,
     line: usize,
-    sum: Arc<AtomicU32>,
+    sum: Darc<AtomicU32>,
 }
 
 #[local_am]
@@ -98,9 +98,53 @@ impl LamellarAm for Part2V2 {
     }
 }
 
+#[AmLocalData(Debug)]
+struct Part2V3 {
+    games: Darc<Vec<String>>,
+    line: usize,
+    // cards: LocalRwDarc<HashMap<usize, usize>>,
+    cards: Darc<Mutex<HashMap<usize, usize>>>,
+}
+
+#[local_am]
+impl LamellarAm for Part2V3 {
+    async fn exec() {
+        let mut my_cards = HashMap::new();
+        let mut max_line = self.line + 1;
+        let mut cur_line = self.line;
+
+        while cur_line < max_line {
+            let copies = *my_cards.entry(cur_line).or_insert(1);
+            let mut line = self.games[cur_line].split(":");
+            let _game = line.next();
+            let numbers = line.next().expect("properly formed line").split("|");
+            let num_matches = get_matches(numbers);
+            let end_line = cur_line + 1 + num_matches;
+            for j in cur_line + 1..end_line {
+                *my_cards.entry(j).or_insert(0) += copies; //the one is the original card and then  add how many copies of the card there are
+            }
+            if max_line < end_line {
+                max_line = end_line
+            }
+            cur_line += 1;
+            println!(
+                "[{}] cur_line: {}, max_line: {}",
+                self.line, cur_line, max_line
+            );
+        }
+        // let mut cards = self.cards.write().await;
+        let mut cards = self.cards.lock().unwrap();
+        println!("[{}] my_cards: {:?}", self.line, my_cards);
+        for (k, v) in my_cards {
+            *cards.entry(k).or_insert(0) += v;
+        }
+        println!("[{}] cards: {:?}", self.line, cards);
+    }
+}
+
 pub fn part_1(world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
-    let sum = Arc::new(AtomicU32::new(0));
+    let f = File::open("inputs/day4_test.txt").unwrap();
+    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
     for line in BufReader::new(&f).lines().into_iter() {
         world.exec_am_local(Part1 {
             line: line.expect("line exists"),
@@ -112,15 +156,17 @@ pub fn part_1(world: &LamellarWorld) {
 }
 
 pub fn part_2(world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
-    let games = Arc::new(
+    let f = File::open("inputs/day4_test.txt").unwrap();
+    let games = Darc::new(
+        world,
         BufReader::new(&f)
             .lines()
             .into_iter()
             .map(|line| line.expect("line exists"))
             .collect::<Vec<_>>(),
-    );
-    let sum = Arc::new(AtomicU32::new(0));
+    )
+    .unwrap();
+    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
     for i in 0..games.len() {
         world.exec_am_local(Part2 {
             games: games.clone(),
@@ -133,15 +179,17 @@ pub fn part_2(world: &LamellarWorld) {
 }
 
 pub fn part_2_v2(world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
-    let games = Arc::new(
+    let f = File::open("inputs/day4_test.txt").unwrap();
+    let games = Darc::new(
+        world,
         BufReader::new(&f)
             .lines()
             .into_iter()
             .map(|line| line.expect("line exists"))
             .collect::<Vec<_>>(),
-    );
-    let sum = Arc::new(AtomicU32::new(0));
+    )
+    .unwrap();
+    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
     for i in 0..games.len() {
         world.exec_am_local(Part2V2 {
             games: games.clone(),
@@ -153,10 +201,38 @@ pub fn part_2_v2(world: &LamellarWorld) {
     println!("Sum: {:?}", sum.load(Ordering::SeqCst));
 }
 
-// this is a case where the lamellar approach likely does make much sense
-// and a more efficent way is provided
+pub fn part_2_v3(world: &LamellarWorld) {
+    let f = File::open("inputs/day4_test.txt").unwrap();
+    let games = Darc::new(
+        world,
+        BufReader::new(&f)
+            .lines()
+            .into_iter()
+            .map(|line| line.expect("line exists"))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    // let cards: LocalRwDarc<HashMap<_, usize>> = LocalRwDarc::new(world, HashMap::new()).unwrap();
+    let cards = Darc::new(world, Mutex::new(HashMap::new())).unwrap();
+
+    for i in 0..games.len() {
+        world.exec_am_local(Part2V3 {
+            games: games.clone(),
+            line: i,
+            cards: cards.clone(),
+        });
+    }
+    world.wait_all();
+    println!("here");
+    let sum: usize = cards.lock().unwrap().iter().map(|(_, v)| v).sum();
+    println!("Sum: {sum}");
+}
+
+// the serial version below is significantly faster,
+// but the dependency of a card on the cards occuring before
+// it limits parallelism that an lamellar approach can represent
 pub fn part_2_serial(_world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
+    let f = File::open("inputs/day4_test.txt").unwrap();
     // let sum = Arc::new(AtomicU32::new(0));
 
     let mut cards = HashMap::<usize, usize>::new();

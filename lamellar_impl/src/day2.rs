@@ -2,7 +2,7 @@ use lamellar::active_messaging::prelude::*;
 
 use std::{
     fs::File,
-    io::{BufRead, BufReader, Seek, SeekFrom},
+    io::{BufRead, BufReader},
 };
 
 const MAX_RED: u32 = 12;
@@ -57,7 +57,6 @@ struct Part2 {
 #[am]
 impl LamellarAm for Part2 {
     async fn exec() -> u32 {
-        let mut valid = true;
         let line = self.line.split(":").collect::<Vec<&str>>();
         let mut min_blue = 0;
         let mut min_red = 0;
@@ -122,7 +121,7 @@ pub fn part_1_task_group(world: &LamellarWorld) {
         .block_on(tg.exec())
         .iter()
         .map(|x| {
-            if let AmGroupResult::Pe(pe, val) = x {
+            if let AmGroupResult::Pe(_pe, val) = x {
                 *val
             } else {
                 0
@@ -163,7 +162,7 @@ pub fn part_2_task_group(world: &LamellarWorld) {
         .block_on(tg.exec())
         .iter()
         .map(|x| {
-            if let AmGroupResult::Pe(pe, val) = x {
+            if let AmGroupResult::Pe(_pe, val) = x {
                 *val
             } else {
                 0
