@@ -1,10 +1,10 @@
+use crate::WORLD;
+use aoc_runner_derive::aoc;
 use lamellar::active_messaging::prelude::*;
 use lamellar::darc::prelude::*;
 
 use std::{
     collections::{HashMap, HashSet},
-    fs::File,
-    io::{BufRead, BufReader},
     str::{self, Split},
     sync::atomic::{AtomicU32, Ordering},
 };
@@ -105,77 +105,78 @@ impl LamellarAm for Part2Fast {
     }
 }
 
-pub fn part_1(world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
-    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
-    for line in BufReader::new(&f).lines().into_iter() {
-        world.exec_am_local(Part1 {
-            line: line.expect("line exists"),
+#[aoc(day4, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &str) -> u32 {
+    WORLD.num_pes() as u32
+}
+
+#[aoc(day4, part1, am)]
+pub fn part_1_am(input: &str) -> u32 {
+    let sum = Darc::new(WORLD.team(), AtomicU32::new(0)).unwrap();
+    for line in input.lines() {
+        WORLD.exec_am_local(Part1 {
+            line: line.to_string(),
             sum: sum.clone(),
         });
     }
-    world.wait_all();
-    println!("Sum: {:?}", sum.load(Ordering::SeqCst));
+    WORLD.wait_all();
+    sum.load(Ordering::SeqCst)
 }
 
-pub fn part_2_slow(world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
+// #[aoc(day4, part2, slow)]
+// pub fn part_2_slow(input: &str) -> u32 {
+//     let games = Darc::new(
+//         WORLD.team(),
+//         input
+//             .lines()
+//             .map(|line| line.to_string())
+//             .collect::<Vec<_>>(),
+//     )
+//     .unwrap();
+//     let sum = Darc::new(WORLD.team(), AtomicU32::new(0)).unwrap();
+//     for i in 0..games.len() {
+//         WORLD.exec_am_local(Part2Slow {
+//             games: games.clone(),
+//             line: i,
+//             sum: sum.clone(),
+//         });
+//     }
+//     WORLD.wait_all();
+//     sum.load(Ordering::SeqCst)
+// }
+
+#[aoc(day4, part2, fast)]
+pub fn part_2_fast(input: &str) -> u32 {
     let games = Darc::new(
-        world,
-        BufReader::new(&f)
+        WORLD.team(),
+        input
             .lines()
-            .into_iter()
-            .map(|line| line.expect("line exists"))
+            .map(|line| line.to_string())
             .collect::<Vec<_>>(),
     )
     .unwrap();
-    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
-    for i in 0..games.len() {
-        world.exec_am_local(Part2Slow {
-            games: games.clone(),
-            line: i,
-            sum: sum.clone(),
-        });
-    }
-    world.wait_all();
-    println!("Sum: {:?}", sum.load(Ordering::SeqCst));
-}
-
-pub fn part_2_fast(world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
-    let games = Darc::new(
-        world,
-        BufReader::new(&f)
-            .lines()
-            .into_iter()
-            .map(|line| line.expect("line exists"))
-            .collect::<Vec<_>>(),
-    )
-    .unwrap();
-    let cards: LocalRwDarc<HashMap<_, usize>> = LocalRwDarc::new(world, HashMap::new()).unwrap();
+    let cards: LocalRwDarc<HashMap<_, usize>> =
+        LocalRwDarc::new(WORLD.team(), HashMap::new()).unwrap();
 
     for i in 0..games.len() {
-        world.exec_am_local(Part2Fast {
+        WORLD.exec_am_local(Part2Fast {
             games: games.clone(),
             line: i,
             cards: cards.clone(),
         });
     }
-    world.wait_all();
-    let sum: usize = world.block_on(cards.read()).iter().map(|(_, v)| v).sum();
-    println!("Sum: {sum}");
+    WORLD.wait_all();
+    WORLD
+        .block_on(cards.read())
+        .iter()
+        .map(|(_, v)| v)
+        .sum::<usize>() as u32
 }
 
-pub fn part_2_serial(_world: &LamellarWorld) {
-    let f = File::open("inputs/day4.txt").unwrap();
-
+#[aoc(day4, part2, serial)]
+pub fn part_2_serial(input: &str) -> u32 {
     let mut cards = HashMap::<usize, usize>::new();
-    for (i, line) in BufReader::new(&f)
-        .lines()
-        .into_iter()
-        .map(|line| line.expect("line exists"))
-        .enumerate()
-    {
+    for (i, line) in input.lines().enumerate() {
         let copies = *cards.entry(i).or_insert(1); //one for original card
         let mut line = line.split(":");
         let _game = line.next();
@@ -185,6 +186,5 @@ pub fn part_2_serial(_world: &LamellarWorld) {
             *cards.entry(new_line).or_insert(1) += copies; //the one is the original card and then  add how many copies of the card there are
         }
     }
-    let sum: usize = cards.iter().map(|(_, v)| v).sum();
-    println!("Sum: {sum}");
+    cards.iter().map(|(_, v)| v).sum::<usize>() as u32
 }

@@ -1,12 +1,24 @@
+use crate::WORLD;
+use aoc_runner_derive::{aoc, aoc_generator};
 use lamellar::active_messaging::prelude::*;
 use lamellar::darc::prelude::*;
 
 use std::{
-    fs::File,
-    io::{BufRead, BufReader},
     str,
     sync::atomic::{AtomicU32, Ordering},
 };
+
+#[aoc_generator(day3)]
+fn parse(input: &str) -> Darc<Vec<Vec<u8>>> {
+    Darc::new(
+        WORLD.team(),
+        input
+            .lines()
+            .map(|line| line.to_string().into_bytes())
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
 
 fn check_left(line: &[u8], i: usize) -> u32 {
     let mut start_i = i;
@@ -68,8 +80,33 @@ fn check_center(line: &[u8], i: usize) -> (u32, u32) {
     }
 }
 
+fn process_line_part1(line: usize, schematic: &Vec<Vec<u8>>) -> u32 {
+    let mut my_sum = 0;
+    for (i, c) in schematic[line]
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (i, *c as char))
+    {
+        if !c.is_numeric() && c != '.' {
+            // check line above me
+            if line != 0 {
+                let center = check_center(&schematic[line - 1], i);
+                my_sum += center.0 + center.1;
+            }
+            // check my line
+            my_sum += check_left(&schematic[line], i) + check_right(&schematic[line], i);
+            // check below me
+            if line != schematic.len() - 1 {
+                let center = check_center(&schematic[line + 1], i);
+                my_sum += center.0 + center.1;
+            }
+        }
+    }
+    my_sum
+}
+
 // we can also create active messages that only execute locally
-#[AmLocalData(Debug)]
+#[AmData(Debug)]
 struct Part1 {
     // a darc is lamellar construct for a "distributed Arc"
     schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
@@ -77,33 +114,60 @@ struct Part1 {
     sum: Darc<AtomicU32>,
 }
 
-#[local_am]
+#[am]
 impl LamellarAm for Part1 {
     async fn exec() {
-        let mut my_sum = 0;
-        for (i, c) in self.schematic[self.line]
-            .iter()
-            .enumerate()
-            .map(|(i, c)| (i, *c as char))
-        {
-            if !c.is_numeric() && c != '.' {
-                // check line above me
-                if self.line != 0 {
-                    let center = check_center(&self.schematic[self.line - 1], i);
-                    my_sum += center.0 + center.1;
+        self.sum.fetch_add(
+            process_line_part1(self.line, &self.schematic),
+            Ordering::Relaxed,
+        );
+    }
+}
+
+fn process_line_part2(line: usize, schematic: &Vec<Vec<u8>>) -> u32 {
+    let mut my_sum = 0;
+    for (i, c) in schematic[line]
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (i, *c as char))
+    {
+        if !c.is_numeric() && c != '.' {
+            let mut nums = vec![];
+            // check line above me
+            if line != 0 {
+                let center = check_center(&schematic[line - 1], i);
+                if center.0 != 0 {
+                    nums.push(center.0);
                 }
-                // check my line
-                my_sum += check_left(&self.schematic[self.line], i)
-                    + check_right(&self.schematic[self.line], i);
-                // check below me
-                if self.line != self.schematic.len() - 1 {
-                    let center = check_center(&self.schematic[self.line + 1], i);
-                    my_sum += center.0 + center.1;
+                if center.1 != 0 {
+                    nums.push(center.1);
                 }
             }
+            // check my line
+            let left = check_left(&schematic[line], i);
+            if left != 0 {
+                nums.push(left);
+            }
+            let right = check_right(&schematic[line], i);
+            if right != 0 {
+                nums.push(right);
+            }
+            // check below me
+            if line != schematic.len() - 1 {
+                let center = check_center(&schematic[line + 1], i);
+                if center.0 != 0 {
+                    nums.push(center.0);
+                }
+                if center.1 != 0 {
+                    nums.push(center.1);
+                }
+            }
+            if nums.len() == 2 {
+                my_sum += nums[0] * nums[1];
+            }
         }
-        self.sum.fetch_add(my_sum, Ordering::Relaxed);
     }
+    my_sum
 }
 
 #[AmLocalData(Debug)]
@@ -116,96 +180,62 @@ struct Part2 {
 #[local_am]
 impl LamellarAm for Part2 {
     async fn exec() {
-        let mut my_sum = 0;
-        for (i, c) in self.schematic[self.line]
-            .iter()
-            .enumerate()
-            .map(|(i, c)| (i, *c as char))
-        {
-            if !c.is_numeric() && c != '.' {
-                let mut nums = vec![];
-                // check line above me
-                if self.line != 0 {
-                    let center = check_center(&self.schematic[self.line - 1], i);
-                    if center.0 != 0 {
-                        nums.push(center.0);
-                    }
-                    if center.1 != 0 {
-                        nums.push(center.1);
-                    }
-                }
-                // check my line
-                let left = check_left(&self.schematic[self.line], i);
-                if left != 0 {
-                    nums.push(left);
-                }
-                let right = check_right(&self.schematic[self.line], i);
-                if right != 0 {
-                    nums.push(right);
-                }
-                // check below me
-                if self.line != self.schematic.len() - 1 {
-                    let center = check_center(&self.schematic[self.line + 1], i);
-                    if center.0 != 0 {
-                        nums.push(center.0);
-                    }
-                    if center.1 != 0 {
-                        nums.push(center.1);
-                    }
-                }
-                if nums.len() == 2 {
-                    my_sum += nums[0] * nums[1];
-                }
-            }
-        }
-        self.sum.fetch_add(my_sum, Ordering::Relaxed);
+        self.sum.fetch_add(
+            process_line_part2(self.line, &self.schematic),
+            Ordering::Relaxed,
+        );
     }
 }
 
-pub fn part_1(world: &LamellarWorld) {
-    let f = File::open("inputs/day3.txt").unwrap();
-    let schematic = Darc::new(
-        world,
-        BufReader::new(&f)
-            .lines()
-            .into_iter()
-            .map(|line| line.expect("line exists").into_bytes())
-            .collect::<Vec<_>>(),
-    )
-    .unwrap();
-    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
-    for i in 0..schematic.len() {
-        world.exec_am_local(Part1 {
-            schematic: schematic.clone(),
+#[aoc(day3, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &Darc<Vec<Vec<u8>>>) -> u32 {
+    WORLD.num_pes() as u32
+}
+
+#[aoc(day3, part1, serial)]
+pub fn part_1_serial(input: &Darc<Vec<Vec<u8>>>) -> u32 {
+    input
+        .iter()
+        .enumerate()
+        .map(|(i, _)| process_line_part1(i, input))
+        .sum()
+}
+
+#[aoc(day3, part1, am)]
+pub fn part_1_am(input: &Darc<Vec<Vec<u8>>>) -> u32 {
+    let sum = Darc::new(WORLD.team(), AtomicU32::new(0)).unwrap();
+    for i in 0..input.len() {
+        WORLD.exec_am_local(Part1 {
+            schematic: input.clone(),
             line: i,
             sum: sum.clone(),
         });
     }
-    world.wait_all();
-    println!("Sum: {:?}", sum.load(Ordering::SeqCst));
+    WORLD.wait_all();
+    sum.load(Ordering::SeqCst)
 }
 
-pub fn part_2(world: &LamellarWorld) {
-    let f = File::open("inputs/day3.txt").unwrap();
-    let schematic = Darc::new(
-        world,
-        BufReader::new(&f)
-            .lines()
-            .into_iter()
-            .map(|line| line.expect("line exists").into_bytes())
-            .collect::<Vec<_>>(),
-    )
-    .unwrap();
-    let sum = Darc::new(world, AtomicU32::new(0)).unwrap();
-    for i in 0..schematic.len() {
-        world.exec_am_local(Part2 {
-            schematic: schematic.clone(),
+#[aoc(day3, part2, serial)]
+pub fn part_2_serial(input: &Darc<Vec<Vec<u8>>>) -> u32 {
+    input
+        .iter()
+        .enumerate()
+        .map(|(i, _)| process_line_part1(i, input))
+        .sum()
+}
+
+#[aoc(day3, part2, am)]
+pub fn part_2_am(input: &Darc<Vec<Vec<u8>>>) -> u32 {
+    let sum = Darc::new(WORLD.team(), AtomicU32::new(0)).unwrap();
+    for i in 0..input.len() {
+        WORLD.exec_am_local(Part2 {
+            schematic: input.clone(),
             line: i,
             sum: sum.clone(),
         });
     }
-    world.wait_all();
-    println!("Sum: {:?}", sum.load(Ordering::SeqCst));
+    WORLD.wait_all();
+    sum.load(Ordering::SeqCst)
 }
 
 // pub fn part_2_task_group(world: &LamellarWorld) {

@@ -33,6 +33,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 
 [[package]]
+name = "aoc-runner"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d21ef9204ad206a5a3e918e9920da04e1118ad91ce4f23570be964b9d6b9dfcb"
+
+[[package]]
+name = "aoc-runner-derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba8b944269d3fee645d281b1335e1797044db497bb02d0098cc3fdb8900069cc"
+dependencies = [
+ "aoc-runner-internal",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "aoc-runner-internal"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "274b0ba7f3669a45ec0aaacf94eb032a749de880ab776091576cca94037c9982"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -853,6 +882,7 @@ dependencies = [
 [[package]]
 name = "lamellar"
 version = "0.6.0"
+source = "git+https://github.com/pnnl/lamellar-runtime.git#dbab8a002c0b2c4f384c458a3ab3c79987796a64"
 dependencies = [
  "anyhow",
  "async-lock 2.8.0",
@@ -897,6 +927,7 @@ dependencies = [
 [[package]]
 name = "lamellar-impl"
 version = "0.6.0"
+source = "git+https://github.com/pnnl/lamellar-runtime.git#dbab8a002c0b2c4f384c458a3ab3c79987796a64"
 dependencies = [
  "async-trait",
  "futures",
@@ -908,11 +939,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "lamellar_impl"
+name = "lamellar_aoc23"
 version = "0.1.0"
 dependencies = [
+ "aoc-runner",
+ "aoc-runner-derive",
  "futures",
  "lamellar",
+ "once_cell",
 ]
 
 [[package]]
