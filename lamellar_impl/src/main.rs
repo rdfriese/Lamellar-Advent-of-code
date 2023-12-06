@@ -4,6 +4,7 @@ mod day1;
 mod day2;
 mod day3;
 mod day4;
+mod day5;
 
 fn main() {
     let world = LamellarWorldBuilder::new().build();
@@ -40,16 +41,29 @@ fn main() {
     // day3::part_2(&world);
     // println!("time: {:?}", start.elapsed());
 
+    //     let start = std::time::Instant::now();
+    //     day4::part_1(&world);
+    //     println!("time: {:?}", start.elapsed());
+    //     let start = std::time::Instant::now();
+    //     day4::part_2_slow(&world);
+    //     println!("time: {:?}", start.elapsed());
+    //     let start = std::time::Instant::now();
+    //     day4::part_2_fast(&world);
+    //     println!("time: {:?}", start.elapsed());
+    //     let start = std::time::Instant::now();
+    //     day4::part_2_serial(&world);
+    //     println!("time: {:?}", start.elapsed());
+
     let start = std::time::Instant::now();
-    day4::part_1(&world);
+    day5::part_1_serial(&world);
     println!("time: {:?}", start.elapsed());
     let start = std::time::Instant::now();
-    day4::part_2_slow(&world);
+    day5::part_1(&world);
     println!("time: {:?}", start.elapsed());
     let start = std::time::Instant::now();
-    day4::part_2_fast(&world);
+    day5::part_2_serial(&world);
     println!("time: {:?}", start.elapsed());
     let start = std::time::Instant::now();
-    day4::part_2_serial(&world);
+    day5::part_2(&world);
     println!("time: {:?}", start.elapsed());
 }
