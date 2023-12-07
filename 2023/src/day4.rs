@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-fn get_matches<'a>(mut numbers: Split<'a, &str>) -> usize {
+fn get_matches<'a>(mut numbers: Split<'a, &str>) -> u32 {
     let winning = numbers
         .next()
         .expect("properly formed line")
@@ -24,7 +24,7 @@ fn get_matches<'a>(mut numbers: Split<'a, &str>) -> usize {
         .split(" ")
         .filter_map(|x| x.parse::<u32>().ok())
         .collect::<HashSet<_>>();
-    winning.intersection(&my_numbers).count()
+    winning.intersection(&my_numbers).count() as u32
 }
 
 #[AmLocalData(Debug)]
@@ -59,7 +59,7 @@ impl LamellarAm for Part2Slow {
         let _game = line.next();
         let numbers = line.next().expect("properly formed line").split("|");
         let num_matches = get_matches(numbers);
-        for new_line in self.line + 1..self.line + 1 + num_matches {
+        for new_line in self.line + 1..self.line + 1 + num_matches as usize {
             lamellar::world.exec_am_local(Part2Slow {
                 games: self.games.clone(),
                 line: new_line,
@@ -89,7 +89,7 @@ impl LamellarAm for Part2Fast {
             let _game = line.next();
             let numbers = line.next().expect("properly formed line").split("|");
             let num_matches = get_matches(numbers);
-            let end_line = cur_line + 1 + num_matches;
+            let end_line = cur_line + 1 + num_matches as usize;
             for j in cur_line + 1..end_line {
                 *my_cards.entry(j).or_insert(0) += copies; //the one is the original card and then  add how many copies of the card there are
             }
@@ -108,6 +108,19 @@ impl LamellarAm for Part2Fast {
 #[aoc(day4, part1, A_INIT_WORLD)]
 pub fn part_1(_input: &str) -> u32 {
     WORLD.num_pes() as u32
+}
+#[aoc(day4, part1, serial)]
+pub fn part_1_serial(input: &str) -> u32 {
+    input
+        .lines()
+        .map(|line| {
+            let mut line = line.split(":");
+            let _game = line.next();
+            let numbers = line.next().expect("properly formed line").split("|");
+            let num_matches = get_matches(numbers) as u32;
+            2_u32.pow(num_matches - 1) as u32
+        })
+        .sum::<u32>()
 }
 
 #[aoc(day4, part1, am)]
@@ -182,7 +195,7 @@ pub fn part_2_serial(input: &str) -> u32 {
         let _game = line.next();
         let numbers = line.next().expect("properly formed line").split("|");
         let num_matches = get_matches(numbers);
-        for new_line in i + 1..i + 1 + num_matches {
+        for new_line in i + 1..i + 1 + num_matches as usize {
             *cards.entry(new_line).or_insert(1) += copies; //the one is the original card and then  add how many copies of the card there are
         }
     }
