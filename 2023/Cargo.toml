@@ -9,6 +9,7 @@ edition = "2021"
 aoc-runner = "0.3.0"
 aoc-runner-derive = "0.3.0"
 futures = "0.3.29"
+itertools = "0.12.0"
 #lamellar = "0.6.0"
 #lamellar = { path = "../../lamellar-runtime-junction" }
 lamellar = { git = "https://github.com/pnnl/lamellar-runtime.git" }
