@@ -4,6 +4,7 @@ mod day3;
 mod day4;
 mod day5;
 mod day7;
+mod day8;
 
 use lamellar::{LamellarWorld, LamellarWorldBuilder};
 use once_cell::sync::Lazy;
