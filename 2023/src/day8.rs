@@ -2,8 +2,6 @@ use crate::WORLD;
 use aoc_runner_derive::{aoc, aoc_generator};
 use lamellar::active_messaging::prelude::*;
 use lamellar::array::prelude::*;
-use lamellar::darc::prelude::*;
-use num::integer::Integer;
 
 const LAST_DIGIT: u16 = 676; // 26.pow(2)
 const MID_DIGIT: u16 = 26; // 26.pow(1)
@@ -145,7 +143,6 @@ impl std::ops::Index<usize> for Coordinates {
 
 #[aoc_generator(day8, part1, lamellar)]
 fn parse_part1_lamellar(input: &str) -> (Vec<usize>, ReadOnlyArray<Coordinates>) {
-    // let mut data = vec![[0_u16, 0_u16]; MAX_NUM + 1];
     let data = LocalLockArray::new(&*WORLD, MAX_NUM + 1, Distribution::Block);
     let mut lines = input.lines();
     let directions = lines
@@ -175,7 +172,6 @@ fn parse_part1_lamellar(input: &str) -> (Vec<usize>, ReadOnlyArray<Coordinates>)
         indices.push(index as usize);
         coordinates.push(Coordinates { l: left, r: right });
     }
-    println!("{:?} {:?}", indices, coordinates);
     WORLD.block_on(data.batch_store(indices, coordinates)); //Lamellar will effeciently aggregate and apply the operation
 
     (directions, data.into_read_only())
@@ -198,3 +194,146 @@ pub fn part_1_lamellar_array(
         cnt
     })
 }
+
+#[AmData(Default, Debug, ArrayOps)]
+pub struct Coordinates2 {
+    l: u16,
+    r: u16,
+    z: u16,
+}
+
+impl std::ops::Index<usize> for Coordinates2 {
+    type Output = u16;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.l,
+            1 => &self.r,
+            _ => &self.z,
+        }
+    }
+}
+#[aoc_generator(day8, part2, lamellar)]
+fn parse_part2_lamellar(
+    input: &str,
+) -> (
+    Vec<usize>,
+    ReadOnlyArray<usize>,
+    ReadOnlyArray<Coordinates2>,
+) {
+    let data = LocalLockArray::new(&*WORLD, MAX_NUM + 1, Distribution::Block);
+
+    let mut lines = input.lines();
+    let directions = lines
+        .next()
+        .unwrap()
+        .chars()
+        .map(|c| if c == 'L' { 0 } else { 1 }) //we just assume the input is only L and R
+        .collect::<Vec<usize>>();
+    lines.next();
+    let mut indices = vec![];
+    let mut coordinates = vec![];
+    let mut starts = vec![];
+    for line in lines {
+        let u8_line = line.as_bytes();
+        let first = (u8_line[2] - 65) as u16 * FIRST_DIGIT;
+        let index =
+            (u8_line[0] - 65) as u16 * LAST_DIGIT + (u8_line[1] - 65) as u16 * MID_DIGIT + first;
+        if first == 0 {
+            starts.push(index as usize);
+        }
+        let z = if first == 25 { 1 } else { 0 };
+        let left = (u8_line[7] - 65) as u16 * LAST_DIGIT
+            + (u8_line[8] - 65) as u16 * MID_DIGIT
+            + (u8_line[9] - 65) as u16 * FIRST_DIGIT;
+        let right = (u8_line[12] - 65) as u16 * LAST_DIGIT
+            + (u8_line[13] - 65) as u16 * MID_DIGIT
+            + (u8_line[14] - 65) as u16 * FIRST_DIGIT;
+        // we could very easily just call the following
+        // data.store(index as usize, Coordinates { l: left, r: right });
+        // but... currently single array ops in Lamellar are not terribly optimized so we prefer
+        // to batch operations
+        indices.push(index as usize);
+        coordinates.push(Coordinates2 {
+            l: left,
+            r: right,
+            z,
+        });
+    }
+    let data_init = data.batch_store(indices, coordinates);
+    let start_array = LocalLockArray::new(&*WORLD, starts.len(), Distribution::Block);
+    WORLD.block_on(data_init);
+    WORLD.block_on(start_array.batch_store((0..starts.len()).collect::<Vec<usize>>(), starts)); //Lamellar will effeciently aggregate and apply the operation
+
+    (
+        directions,
+        start_array.into_read_only(),
+        data.into_read_only(),
+    )
+}
+
+#[aoc(day8, part2, lamellar)]
+pub fn part_2_lamellar_array(
+    (directions, starts, data): &(
+        Vec<usize>,
+        ReadOnlyArray<usize>,
+        ReadOnlyArray<Coordinates2>,
+    ),
+) -> usize {
+    let counts = AtomicArray::new(&*WORLD, starts.len(), Distribution::Block);
+    let starts = starts.clone();
+    let data = data.clone();
+    let directions = directions.clone();
+    WORLD.block_on(async move {
+        starts
+            .local_iter()
+            .zip(counts.local_iter_mut())
+            .for_each_async(move |(i, cnt)| {
+                let directions = directions.clone();
+                let data = data.clone();
+                async move {
+                    let mut cur_index = *i;
+                    for dir in directions.iter().cycle() {
+                        let cur_data = data.load(cur_index).await;
+                        if cur_data[2] as usize == 1 {
+                            break;
+                        }
+                        cnt.fetch_add(1);
+                        cur_index = cur_data[*dir as usize] as usize;
+                    }
+                }
+            })
+            .await;
+        counts
+            .onesided_iter()
+            .into_iter()
+            .fold(1, |acc, x| lcm(acc, *x))
+    })
+}
+
+//Ideally we will soon be able to something like this
+// #[aoc(day8, part2, lamellar)]
+// pub fn part_2_lamellar_array(
+//     (directions, starts, data): &(
+//         Vec<usize>,
+//         ReadOnlyArray<usize>,
+//         ReadOnlyArray<Coordinates2>,
+//     ),
+// ) -> usize {
+//     WORLD.block_on(async move {
+//         starts
+//             .local_iter()
+//             .map(|i| async move {
+//                 let mut cnt = 0;
+//                 let mut cur_index = *i;
+//                 for dir in directions.iter().cycle() {
+//                     cnt += 1;
+//                     cur_index = data.load(cur_index).await[*dir as usize] as usize;
+//                     if cur_index == MAX_NUM {
+//                         break;
+//                     }
+//                 }
+//                 cnt
+//             })
+//             .async_reduce(|acc, x| async move { lcm(acc.await, x.await) }) //this is not yet implemented in Lamellar
+//     })
+// }
