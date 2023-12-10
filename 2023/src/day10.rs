@@ -5,8 +5,19 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use lamellar::active_messaging::prelude::*;
 use lamellar::darc::prelude::*;
 
-#[aoc_generator(day10)]
+#[aoc_generator(day10, part1)]
 fn parse_part1(input: &str) -> LocalRwDarc<Vec<Vec<u8>>> {
+    LocalRwDarc::new(
+        &*WORLD,
+        input
+            .lines()
+            .map(|line| line.as_bytes().to_vec())
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+#[aoc_generator(day10, part2)]
+fn parse_part2(input: &str) -> LocalRwDarc<Vec<Vec<u8>>> {
     LocalRwDarc::new(
         &*WORLD,
         input
@@ -174,13 +185,15 @@ fn part1(data: &mut [Vec<u8>]) -> isize {
     // }
     // std::cmp::max(cnts[0], cnts[1])
     let (mut prev, mut cur) = paths[0];
+    let start = prev;
     let mut cnt = 0;
     while let Some(next) = next_tile(data[cur.0][cur.1], cur.0, cur.1, prev.0, prev.1) {
-        data[cur.0][cur.1] = 'X' as u8;
+        data[cur.0][cur.1] = b'X';
         prev = cur;
         cur = next;
         cnt += 1;
     }
+    data[start.0][start.1] = b'X';
     (cnt as f32 / 2.0).ceil() as isize
 }
 
@@ -205,6 +218,46 @@ struct Part1 {
 pub fn part_1_serial(data: &LocalRwDarc<Vec<Vec<u8>>>) -> isize {
     let mut data_guard = WORLD.block_on(data.write());
     part1(data_guard.deref_mut())
+}
+
+fn part2(data: &mut [Vec<u8>]) -> isize {
+    let mut cnt = 0;
+    for line in data.iter_mut() {
+        // println!("{}", String::from_utf8_lossy(line.as_slice()));
+        let mut in_loop = false;
+        let mut tmp_cnt = 0;
+
+        for c in 0..line.len() - 1 {
+            if line[c] == b'X' {
+                if line[c + 1] != b'X' {
+                    // println!("found edge  {:?}, {:?}", cur as char, *next as char);
+                    in_loop = !in_loop;
+                    cnt += tmp_cnt;
+                    tmp_cnt = 0;
+                }
+            } else if in_loop {
+                // cur = b'I';
+                line[c] = b'I';
+                tmp_cnt += 1;
+                if line[c + 1] == b'X' {
+                    cnt += tmp_cnt;
+                    tmp_cnt = 0;
+                    in_loop = false;
+                }
+            }
+        }
+        // println!("cnt: {}", cnt);
+    }
+    print_data(data);
+    cnt
+}
+
+#[aoc(day10, part2, serial)]
+pub fn part_2_serial(data: &LocalRwDarc<Vec<Vec<u8>>>) -> isize {
+    let mut data_guard = WORLD.block_on(data.write());
+    part1(data_guard.deref_mut());
+    print_data(data_guard.deref_mut());
+    part2(data_guard.deref_mut())
 }
 
 // #[aoc(day10, part1, am)]
