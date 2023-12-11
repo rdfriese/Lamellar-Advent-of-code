@@ -3,6 +3,15 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use lamellar::active_messaging::prelude::*;
 use lamellar::darc::prelude::*;
 
+// need to construct a LamellarWorld
+// but only one can be constructed per execution
+// so simply use this to initialize to once_cell containing
+// the world so as not to affect the timings of the actual solutions
+#[aoc(day1, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &str) -> u32 {
+    WORLD.num_pes() as u32
+}
+
 fn process_line_part1(line: &str) -> u32 {
     let first = line
         .chars()
@@ -68,15 +77,6 @@ fn process_line_part2(line: &str) -> u32 {
         (None, Some(x)) => x,
         (None, None) => 0,
     }
-}
-
-// need to construct a LamellarWorld
-// but only one can be constructed per execution
-// so simply use this to initialize to once_cell containing
-// the world so as not to affect the timings of the actual solutions
-#[aoc(day1, part1, A_INIT_WORLD)]
-pub fn part_1(_input: &str) -> u32 {
-    WORLD.num_pes() as u32
 }
 
 #[aoc(day1, part1, serial)]
