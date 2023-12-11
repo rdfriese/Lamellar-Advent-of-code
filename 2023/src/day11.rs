@@ -5,18 +5,14 @@ use aoc_runner_derive::aoc;
 use lamellar::active_messaging::prelude::*;
 use lamellar::darc::prelude::*;
 
-//can declare this as a generator as it doesnt work with the benchmarking tool
-// #[aoc_generator(day11, part1)]
 fn parse_input(input: &str, expansion_factor: usize) -> Vec<(u32, u32)> {
     //we'll just create a coordinate list, CSR is probably overkill
     let mut coords = Vec::new();
 
     let mut lines = input.lines().enumerate().peekable();
     let mut empty_cols = vec![true; lines.peek().unwrap().1.len()];
-    // let mut num_empty_rows = 0;
     let mut extra_rows = 0;
     for (j, line) in lines {
-        // let row = j + num_empty_rows * expansion_factor - 1;
         let row = j + extra_rows;
         let line_bytes = line.as_bytes();
         let mut empty_row = true;
@@ -28,7 +24,6 @@ fn parse_input(input: &str, expansion_factor: usize) -> Vec<(u32, u32)> {
             }
         }
         if empty_row {
-            // num_empty_rows += 1;
             extra_rows += expansion_factor - 1;
         }
     }
@@ -60,7 +55,6 @@ pub fn part_1(_: &str) -> usize {
     WORLD.num_pes()
 }
 
-// have each path keep track of its own path cnt, the sum and divide by two
 #[AmLocalData]
 struct Part1 {
     data: Darc<Vec<(u32, u32)>>,
@@ -146,30 +140,3 @@ pub fn part_2_am(data: &str) -> usize {
     WORLD.wait_all();
     cnt.load(Ordering::SeqCst)
 }
-
-// #[aoc(day11, part2, serial)]
-// pub fn part_2_serial(data: &str) -> usize {
-//     let data = parse_input(data);
-//    0
-// }
-
-// #[AmData]
-// struct Part2 {
-//     data: LocalRwDarc<Vec<Vec<u8>>>,
-//     start: usize,
-//     length: usize,
-//     cnt: Darc<AtomicUsize>,
-// }
-
-// #[am]
-// impl LamellarAm for Part2 {
-//     async fn exec() {
-
-//     }
-// }
-
-// #[aoc(day11, part2, am)]
-// pub fn part_2_am(data: &str) -> usize {
-//     let data = parse_input(data);
-//     0
-// }
