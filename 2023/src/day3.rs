@@ -8,16 +8,13 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-#[aoc_generator(day3)]
-fn parse(input: &str) -> Darc<Vec<Vec<u8>>> {
-    Darc::new(
-        WORLD.team(),
-        input
-            .lines()
-            .map(|line| line.to_string().into_bytes())
-            .collect::<Vec<_>>(),
-    )
-    .unwrap()
+// need to construct a LamellarWorld
+// but only one can be constructed per execution
+// so simply use this to initialize to once_cell containing
+// the world so as not to affect the timings of the actual solutions
+#[aoc(day3, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &str) -> u32 {
+    WORLD.num_pes() as u32
 }
 
 fn check_left(line: &[u8], i: usize) -> u32 {
@@ -105,25 +102,6 @@ fn process_line_part1(line: usize, schematic: &Vec<Vec<u8>>) -> u32 {
     my_sum
 }
 
-// we can also create active messages that only execute locally
-#[AmData(Debug)]
-struct Part1 {
-    // a darc is lamellar construct for a "distributed Arc"
-    schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
-    line: usize,
-    sum: Darc<AtomicU32>,
-}
-
-#[am]
-impl LamellarAm for Part1 {
-    async fn exec() {
-        self.sum.fetch_add(
-            process_line_part1(self.line, &self.schematic),
-            Ordering::Relaxed,
-        );
-    }
-}
-
 fn process_line_part2(line: usize, schematic: &Vec<Vec<u8>>) -> u32 {
     let mut my_sum = 0;
     for (i, c) in schematic[line]
@@ -170,10 +148,62 @@ fn process_line_part2(line: usize, schematic: &Vec<Vec<u8>>) -> u32 {
     my_sum
 }
 
+#[aoc_generator(day3, serial)]
+fn parse(input: &str) -> Vec<Vec<u8>> {
+    input
+        .lines()
+        .map(|line| line.to_string().into_bytes())
+        .collect::<Vec<_>>()
+}
+
+#[aoc(day3, part1, serial)]
+pub fn part_1_serial(input: &Vec<Vec<u8>>) -> u32 {
+    input
+        .iter()
+        .enumerate()
+        .map(|(i, _)| process_line_part1(i, input))
+        .sum()
+}
+
+#[aoc(day3, part2, serial)]
+pub fn part_2_serial(input: &Vec<Vec<u8>>) -> u32 {
+    input
+        .iter()
+        .enumerate()
+        .map(|(i, _)| process_line_part2(i, input))
+        .sum()
+}
+
+// we can also create active messages that only execute locally
+#[AmData(Debug)]
+struct Part1 {
+    // a darc is lamellar construct for a "distributed Arc"
+    schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
+    start: usize,
+    n: usize,
+    sum: Darc<AtomicU32>,
+}
+
+#[am]
+impl LamellarAm for Part1 {
+    async fn exec() {
+        self.sum.fetch_add(
+            self.schematic[self.start..]
+                .iter()
+                .enumerate()
+                .step_by(self.n)
+                .map(|(i, _)| process_line_part1(i + self.start, &self.schematic))
+                .sum::<u32>(),
+            Ordering::Relaxed,
+        );
+    }
+}
+
 #[AmLocalData(Debug)]
 struct Part2 {
     schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
-    line: usize,
+    start: usize,
+    n: usize,
     sum: Darc<AtomicU32>,
 }
 
@@ -181,33 +211,37 @@ struct Part2 {
 impl LamellarAm for Part2 {
     async fn exec() {
         self.sum.fetch_add(
-            process_line_part2(self.line, &self.schematic),
+            self.schematic[self.start..]
+                .iter()
+                .enumerate()
+                .step_by(self.n)
+                .map(|(i, _)| process_line_part2(i + self.start, &self.schematic))
+                .sum::<u32>(),
             Ordering::Relaxed,
         );
     }
 }
-
-#[aoc(day3, part1, A_INIT_WORLD)]
-pub fn part_1(_input: &Darc<Vec<Vec<u8>>>) -> u32 {
-    WORLD.num_pes() as u32
-}
-
-#[aoc(day3, part1, serial)]
-pub fn part_1_serial(input: &Darc<Vec<Vec<u8>>>) -> u32 {
-    input
-        .iter()
-        .enumerate()
-        .map(|(i, _)| process_line_part1(i, input))
-        .sum()
+#[aoc_generator(day3, part1, am)]
+fn parse_am(input: &str) -> Darc<Vec<Vec<u8>>> {
+    Darc::new(
+        WORLD.team(),
+        input
+            .lines()
+            .map(|line| line.to_string().into_bytes())
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
 }
 
 #[aoc(day3, part1, am)]
 pub fn part_1_am(input: &Darc<Vec<Vec<u8>>>) -> u32 {
     let sum = Darc::new(WORLD.team(), AtomicU32::new(0)).unwrap();
-    for i in 0..input.len() {
+    let num_threads = WORLD.num_threads_per_pe();
+    for t in 0..num_threads {
         WORLD.exec_am_local(Part1 {
             schematic: input.clone(),
-            line: i,
+            start: t,
+            n: num_threads,
             sum: sum.clone(),
         });
     }
@@ -215,51 +249,30 @@ pub fn part_1_am(input: &Darc<Vec<Vec<u8>>>) -> u32 {
     sum.load(Ordering::SeqCst)
 }
 
-#[aoc(day3, part2, serial)]
-pub fn part_2_serial(input: &Darc<Vec<Vec<u8>>>) -> u32 {
-    input
-        .iter()
-        .enumerate()
-        .map(|(i, _)| process_line_part1(i, input))
-        .sum()
+#[aoc_generator(day3, part2, am)]
+fn parse_am_2(input: &str) -> Darc<Vec<Vec<u8>>> {
+    Darc::new(
+        WORLD.team(),
+        input
+            .lines()
+            .map(|line| line.to_string().into_bytes())
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
 }
 
 #[aoc(day3, part2, am)]
 pub fn part_2_am(input: &Darc<Vec<Vec<u8>>>) -> u32 {
     let sum = Darc::new(WORLD.team(), AtomicU32::new(0)).unwrap();
-    for i in 0..input.len() {
+    let num_threads = WORLD.num_threads_per_pe();
+    for t in 0..num_threads {
         WORLD.exec_am_local(Part2 {
             schematic: input.clone(),
-            line: i,
+            start: t,
+            n: num_threads,
             sum: sum.clone(),
         });
     }
     WORLD.wait_all();
     sum.load(Ordering::SeqCst)
 }
-
-// pub fn part_2_task_group(world: &LamellarWorld) {
-//     let f = File::open("inputs/day2.txt").unwrap();
-//     let my_pe = world.my_pe();
-//     let mut tg = typed_am_group! {Part2, world};
-//     for line in BufReader::new(&f).lines() {
-//         tg.add_am_pe(
-//             my_pe,
-//             Part2 {
-//                 line: line.unwrap(),
-//             },
-//         )
-//     }
-//     let sum: u32 = world
-//         .block_on(tg.exec())
-//         .iter()
-//         .map(|x| {
-//             if let AmGroupResult::Pe(pe, val) = x {
-//                 *val
-//             } else {
-//                 0
-//             }
-//         })
-//         .sum();
-//     println!("Sum: {sum}");
-// }
