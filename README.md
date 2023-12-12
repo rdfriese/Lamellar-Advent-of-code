@@ -17,53 +17,53 @@ Run in WSL on an AMD 7950x
 |   1   | Serial               | 
 |   1   | Active Message       | 
 
-| | | |
+| | | 
 | :---: | -------------- | 
 |   2   | Serial         | 
 |   2   | Active Message | 
 
 
-| | | |
+| | |
 | :---: | ---------------|
 |   3   | Serial         | 
 |   3   | Active Message | 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   4   | Serial         | 
 |   4   | Active Message | 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   5   | Serial         | 
 |   5   | Active Message | 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   6   | Serial         | 
 |   6   | Active Message | 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   7   | Serial         | 
 |   7   | Active Message | 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   8   | Serial         |
 |   8   | Lamellar Array| 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   9   | Serial         |
 |   9   | Active Message | 
 
-| | | |
+| | |
 | :---: | -------------- |
 |   10  | Serial         |
 |   10  | Active Message |
 
-| | | |
+| | |
 | :---: | -------------- |
 |   11  | Serial         |
 |   11  | Active Message |
