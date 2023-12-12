@@ -199,28 +199,6 @@ impl LamellarAm for Part1 {
     }
 }
 
-#[AmLocalData(Debug)]
-struct Part2 {
-    schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
-    start: usize,
-    n: usize,
-    sum: Darc<AtomicU32>,
-}
-
-#[local_am]
-impl LamellarAm for Part2 {
-    async fn exec() {
-        self.sum.fetch_add(
-            self.schematic[self.start..]
-                .iter()
-                .enumerate()
-                .step_by(self.n)
-                .map(|(i, _)| process_line_part2(i + self.start, &self.schematic))
-                .sum::<u32>(),
-            Ordering::Relaxed,
-        );
-    }
-}
 #[aoc_generator(day3, part1, am)]
 fn parse_am(input: &str) -> Darc<Vec<Vec<u8>>> {
     Darc::new(
@@ -247,6 +225,29 @@ pub fn part_1_am(input: &Darc<Vec<Vec<u8>>>) -> u32 {
     }
     WORLD.wait_all();
     sum.load(Ordering::SeqCst)
+}
+
+#[AmLocalData(Debug)]
+struct Part2 {
+    schematic: Darc<Vec<Vec<u8>>>, //store as bytes for easy indexing, assuming input is only ascii
+    start: usize,
+    n: usize,
+    sum: Darc<AtomicU32>,
+}
+
+#[local_am]
+impl LamellarAm for Part2 {
+    async fn exec() {
+        self.sum.fetch_add(
+            self.schematic[self.start..]
+                .iter()
+                .enumerate()
+                .step_by(self.n)
+                .map(|(i, _)| process_line_part2(i + self.start, &self.schematic))
+                .sum::<u32>(),
+            Ordering::Relaxed,
+        );
+    }
 }
 
 #[aoc_generator(day3, part2, am)]
