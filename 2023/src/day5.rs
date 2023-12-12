@@ -3,39 +3,20 @@ use aoc_runner_derive::aoc;
 use lamellar::active_messaging::prelude::*;
 use lamellar::darc::prelude::*;
 
+// need to construct a LamellarWorld
+// but only one can be constructed per execution
+// so simply use this to initialize to once_cell containing
+// the world so as not to affect the timings of the actual solutions
+#[aoc(day5, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &str) -> u32 {
+    WORLD.num_pes() as u32
+}
+
 fn parse_num_list(line: &str) -> Vec<usize> {
     line.trim()
         .split(" ")
         .map(|x| x.parse::<usize>().unwrap())
         .collect::<Vec<usize>>()
-}
-
-#[AmData]
-struct Part1 {
-    seed: usize,
-    #[AmGroup(static)]
-    maps: Darc<Maps>,
-}
-
-#[am]
-impl LamellarAm for Part1 {
-    async fn exec() -> usize {
-        self.maps.get_location(self.seed)
-    }
-}
-
-#[AmData]
-struct Part2 {
-    start_seed: usize,
-    length: usize,
-    maps: Darc<Maps>,
-}
-
-#[am]
-impl LamellarAm for Part2 {
-    async fn exec() -> usize {
-        self.maps.get_location_ranges(self.start_seed, self.length)
-    }
 }
 
 struct Maps {
@@ -224,11 +205,6 @@ impl Maps {
     }
 }
 
-#[aoc(day5, part1, A_INIT_WORLD)]
-pub fn part_1(_input: &str) -> u32 {
-    WORLD.num_pes() as u32
-}
-
 #[aoc(day5, part1, serial)]
 pub fn part_1_serial(input: &str) -> u32 {
     let mut lines = input.lines();
@@ -251,6 +227,24 @@ pub fn part_1_serial(input: &str) -> u32 {
     min as u32
 }
 
+#[AmData]
+struct Part1 {
+    seeds: Vec<usize>,
+    #[AmGroup(static)]
+    maps: Darc<Maps>,
+}
+
+#[am]
+impl LamellarAm for Part1 {
+    async fn exec() -> usize {
+        self.seeds
+            .iter()
+            .map(|&seed| self.maps.get_location(seed))
+            .min()
+            .unwrap()
+    }
+}
+
 #[aoc(day5, part1, am)]
 pub fn part_1_am(input: &str) -> u32 {
     let mut lines = input.lines();
@@ -265,21 +259,38 @@ pub fn part_1_am(input: &str) -> u32 {
     assert_eq!("", lines.next().expect("properly formatted input"));
     let maps = Darc::new(WORLD.team(), Maps::new(lines)).unwrap();
 
+    let num_threads = WORLD.num_threads_per_pe();
+    let num_lines_per_thread = std::cmp::max(1, seeds.len() / num_threads); //for the test inputs
     let reqs = seeds
-        .iter()
-        .map(|&seed| {
+        .chunks(num_lines_per_thread)
+        .map(|chunk| {
             WORLD.exec_am_local(Part1 {
-                seed,
+                seeds: chunk.to_vec(),
                 maps: maps.clone(),
             })
         })
         .collect::<Vec<_>>();
+
     let min = *WORLD
         .block_on(futures::future::join_all(reqs))
         .iter()
         .min()
         .unwrap();
     min as u32
+}
+
+#[AmData]
+struct Part2 {
+    start_seed: usize,
+    length: usize,
+    maps: Darc<Maps>,
+}
+
+#[am]
+impl LamellarAm for Part2 {
+    async fn exec() -> usize {
+        self.maps.get_location_ranges(self.start_seed, self.length)
+    }
 }
 
 #[aoc(day5, part2, serial)]
