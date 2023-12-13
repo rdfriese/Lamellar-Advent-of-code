@@ -30,13 +30,13 @@ fn parse_input2(input: &str, unfold_factor: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         first.push(b'?');
         let mut first = first.repeat(unfold_factor);
         first.pop();
-        let mut second = line_split
+        let second = line_split
             .next()
             .unwrap()
             .split(",")
             .map(|x| x.parse().unwrap())
             .collect::<Vec<u8>>();
-        let mut second = second.repeat(unfold_factor);
+        let second = second.repeat(unfold_factor);
 
         data.push((first, second));
     }
