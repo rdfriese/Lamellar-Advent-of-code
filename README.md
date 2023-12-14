@@ -5,6 +5,14 @@ Still, this is an effort to explore Lamellar and provide some examples on how to
 
 Generally, I will implement a serial solution as well as at least one Lamellar based solution.
 
+I utilize the [cargo-aoc](https://crates.io/crates/cargo-aoc) crate as the execution harness.
+
+install using ` cargo install cargo-aoc`
+
+run using `cargo aoc` optionally specifying a day with `-d <day>`
+
+bench using `cargo aoc bench` optionally specifying a day with `-d <day>` and including the input parsing with `-g`
+
 # Performance
 Run in WSL on an AMD 7950x
 
