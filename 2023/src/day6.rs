@@ -2,6 +2,15 @@ use crate::WORLD;
 use aoc_runner_derive::{aoc, aoc_generator};
 use lamellar::active_messaging::prelude::*;
 
+// need to construct a LamellarWorld
+// but only one can be constructed per execution
+// so simply use this to initialize to once_cell containing
+// the world so as not to affect the timings of the actual solutions
+#[aoc(day6, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &(Vec<f64>, Vec<f64>)) -> u32 {
+    WORLD.num_pes() as u32
+}
+
 fn parse_num_list(line: &str) -> Vec<f64> {
     line.trim()
         .split_whitespace()
@@ -20,12 +29,6 @@ fn parse_num(line: &str) -> f64 {
 
 static ACCEL: f64 = 1.0; //(1mm/ms^2)
 
-#[AmData]
-struct Part1 {
-    time: f64,
-    distance: f64,
-}
-
 //use quadratic formula to get the roots
 // x = -b +- sqrt(b^2 - 4ac) / 2a
 fn return_roots(time: f64, distance: f64) -> (u32, u32) {
@@ -37,14 +40,6 @@ fn return_roots(time: f64, distance: f64) -> (u32, u32) {
         ((-b + discriminant.sqrt()) / (2.0 * a)).floor() as u32,
         ((-b - discriminant.sqrt()) / (2.0 * a)).ceil() as u32,
     )
-}
-
-#[am]
-impl LamellarAm for Part1 {
-    async fn exec() -> u32 {
-        let roots = return_roots(self.time, self.distance);
-        roots.0.abs_diff(roots.1) + 1
-    }
 }
 
 #[aoc_generator(day6, part1)]
@@ -91,11 +86,6 @@ fn parse_part2(input: &str) -> (f64, f64) {
     (time, distance)
 }
 
-#[aoc(day6, part1, A_INIT_WORLD)]
-pub fn part_1(_input: &(Vec<f64>, Vec<f64>)) -> u32 {
-    WORLD.num_pes() as u32
-}
-
 #[aoc(day6, part1, serial)]
 pub fn part_1_serial(input: &(Vec<f64>, Vec<f64>)) -> u32 {
     input
@@ -107,6 +97,29 @@ pub fn part_1_serial(input: &(Vec<f64>, Vec<f64>)) -> u32 {
             roots.0.abs_diff(roots.1) + 1
         })
         .product()
+}
+
+#[aoc(day6, part2, serial)]
+pub fn part_2_serial((time, distance): &(f64, f64)) -> u32 {
+    let roots = return_roots(*time, *distance);
+    roots.0.abs_diff(roots.1) + 1
+}
+
+// Today especially there is really no reason
+// to do anything but the serial versions as the problem
+// is simply too small
+#[AmData]
+struct Part1 {
+    time: f64,
+    distance: f64,
+}
+
+#[am]
+impl LamellarAm for Part1 {
+    async fn exec() -> u32 {
+        let roots = return_roots(self.time, self.distance);
+        roots.0.abs_diff(roots.1) + 1
+    }
 }
 
 #[aoc(day6, part1, am)]
@@ -126,12 +139,6 @@ pub fn part_1_am(input: &(Vec<f64>, Vec<f64>)) -> u32 {
         .block_on(futures::future::join_all(reqs))
         .iter()
         .product::<u32>()
-}
-
-#[aoc(day6, part2, serial)]
-pub fn part_2_serial((time, distance): &(f64, f64)) -> u32 {
-    let roots = return_roots(*time, *distance);
-    roots.0.abs_diff(roots.1) + 1
 }
 
 #[aoc(day6, part2, am)]
