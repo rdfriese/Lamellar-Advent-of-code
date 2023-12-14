@@ -76,11 +76,11 @@ fn cnt_configurations(line: &[u8], ranges: &[u8], cnt: &mut usize) {
 fn cnt_configurations2<'a>(
     line: &'a [u8],
     ranges: &'a [u8],
-    mut memory: HashMap<(&'a [u8], &'a [u8]), usize>,
-) -> (usize, HashMap<(&'a [u8], &'a [u8]), usize>) {
+    mut memory: HashMap<(usize, usize), usize>,
+) -> (usize, HashMap<(usize, usize), usize>) {
     let ranges_len = ranges.iter().map(|x| *x as usize).sum::<usize>() as usize;
     let mut tmp_cnt = 0;
-    if let Some(c) = memory.get(&(line, ranges)) {
+    if let Some(c) = memory.get(&(line.len(), ranges.len())) {
         tmp_cnt = *c;
     } else {
         for (i, w) in line.windows(ranges[0] as usize).enumerate() {
@@ -91,7 +91,7 @@ fn cnt_configurations2<'a>(
                 if ranges.len() == 1 {
                     if !line[i + ranges[0] as usize..].iter().any(|x| *x == b'#') {
                         tmp_cnt += 1;
-                        *memory.entry((line, ranges)).or_insert(0) += 1;
+                        *memory.entry((line.len(), ranges.len())).or_insert(0) += 1;
                     }
                 } else if line[i + ranges[0] as usize] != b'#' {
                     let (c, m) = cnt_configurations2(
@@ -101,7 +101,7 @@ fn cnt_configurations2<'a>(
                     );
                     memory = m;
                     tmp_cnt += c;
-                    *memory.entry((line, ranges)).or_insert(0) += c;
+                    *memory.entry((line.len(), ranges.len())).or_insert(0) += c;
                 }
                 if !w.iter().any(|x| *x == b'?') {
                     return (tmp_cnt, memory);
