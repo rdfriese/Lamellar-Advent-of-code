@@ -18,7 +18,10 @@ fn parse_part1(input: &str) -> Darc<Vec<Vec<i32>>> {
     )
     .unwrap()
 }
-
+// need to construct a LamellarWorld
+// but only one can be constructed per execution
+// so simply use this to initialize to once_cell containing
+// the world so as not to affect the timings of the actual solutions
 #[aoc(day9, part1, A_INIT_WORLD)]
 pub fn part_1(_: &Darc<Vec<Vec<i32>>>) -> usize {
     WORLD.num_pes()
@@ -46,40 +49,9 @@ fn part1_sum(data: &[Vec<i32>]) -> isize {
         .sum()
 }
 
-#[AmData]
-struct Part1 {
-    data: Darc<Vec<Vec<i32>>>,
-    start: usize,
-    length: usize,
-}
-
-#[am]
-impl LamellarAm for Part1 {
-    async fn exec() -> isize {
-        part1_sum(&self.data[self.start..self.start + self.length])
-    }
-}
-
 #[aoc(day9, part1, serial)]
 pub fn part_1_serial(data: &Darc<Vec<Vec<i32>>>) -> isize {
     part1_sum(data)
-}
-
-#[aoc(day9, part1, am)]
-pub fn part_1_am(data: &Darc<Vec<Vec<i32>>>) -> isize {
-    let num_threads = WORLD.num_threads_per_pe();
-    let num_lines_per_thread = std::cmp::max(1, data.len() / num_threads); //for the test inputs
-    let reqs = data.chunks(num_lines_per_thread).enumerate().map(|(i, d)| {
-        WORLD.exec_am_local(Part1 {
-            data: data.clone(),
-            start: i * num_lines_per_thread,
-            length: d.len(),
-        })
-    });
-    WORLD
-        .block_on(futures::future::join_all(reqs))
-        .iter()
-        .sum::<isize>()
 }
 
 pub fn part2_sum(data: &[Vec<i32>]) -> isize {
@@ -104,6 +76,42 @@ pub fn part2_sum(data: &[Vec<i32>]) -> isize {
         .sum()
 }
 
+#[aoc(day9, part2, serial)]
+pub fn part_2_serial(data: &Darc<Vec<Vec<i32>>>) -> isize {
+    part2_sum(data)
+}
+
+#[AmData]
+struct Part1 {
+    data: Darc<Vec<Vec<i32>>>,
+    start: usize,
+    length: usize,
+}
+
+#[am]
+impl LamellarAm for Part1 {
+    async fn exec() -> isize {
+        part1_sum(&self.data[self.start..self.start + self.length])
+    }
+}
+
+#[aoc(day9, part1, am)]
+pub fn part_1_am(data: &Darc<Vec<Vec<i32>>>) -> isize {
+    let num_threads = WORLD.num_threads_per_pe();
+    let num_lines_per_thread = std::cmp::max(1, data.len() / num_threads); //for the test inputs
+    let reqs = data.chunks(num_lines_per_thread).enumerate().map(|(i, d)| {
+        WORLD.exec_am_local(Part1 {
+            data: data.clone(),
+            start: i * num_lines_per_thread,
+            length: d.len(),
+        })
+    });
+    WORLD
+        .block_on(futures::future::join_all(reqs))
+        .iter()
+        .sum::<isize>()
+}
+
 #[AmData]
 struct Part2 {
     data: Darc<Vec<Vec<i32>>>,
@@ -116,11 +124,6 @@ impl LamellarAm for Part2 {
     async fn exec() -> isize {
         part2_sum(&self.data[self.start..self.start + self.length])
     }
-}
-
-#[aoc(day9, part2, serial)]
-pub fn part_2_serial(data: &Darc<Vec<Vec<i32>>>) -> isize {
-    part2_sum(data)
 }
 
 #[aoc(day9, part2, am)]

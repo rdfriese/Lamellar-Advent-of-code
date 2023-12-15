@@ -127,7 +127,11 @@ pub fn part_2_serial(
         .fold(1, |acc, x| lcm(acc, x))
 }
 
-//we need to tell lamellar that we want this type to be used in a lamellar array
+// This problem, isn't well suited to active messages (or a parallel approach)  due to the
+// linear dependency imposed by the problem, each iteration directly depends on the previous one
+// So for the lamellar implementation I will simply highlight some of the Lamellar Array functionalities
+// but do not expect any performance improvement
+
 #[AmData(Default, Debug, ArrayOps)]
 pub struct Coordinates {
     l: u16,
@@ -190,7 +194,7 @@ pub fn part_1_lamellar_array(
         let mut cur_index = 0;
         for dir in directions.iter().cycle() {
             cnt += 1;
-            cur_index = data.load(cur_index).await[*dir as usize] as usize;
+            cur_index = data.load(cur_index).await[*dir as usize] as usize; //if we were running distributed, the runtime would autmatically transfer the value
             if cur_index == MAX_NUM {
                 break;
             }
@@ -289,7 +293,7 @@ pub fn part_2_lamellar_array(
     let directions = directions.clone();
     WORLD.block_on(async move {
         starts
-            .local_iter()
+            .local_iter() // this a (data) parallel iterator, that iterates over a give PEs local array data (no data transfer bewteen PEs occurs)
             .zip(counts.local_iter_mut())
             .for_each_async(move |(i, cnt)| {
                 let directions = directions.clone();
@@ -308,7 +312,7 @@ pub fn part_2_lamellar_array(
             })
             .await;
         counts
-            .onesided_iter()
+            .onesided_iter() // this iterates over all elements in the array, automatically transfering data between PEs
             .into_iter()
             .fold(1, |acc, x| lcm(acc, *x))
     })
