@@ -8,6 +8,15 @@ const MID_DIGIT: u16 = 26; // 26.pow(1)
 const FIRST_DIGIT: u16 = 1; // 26.pow(0)
 const MAX_NUM: usize = 17575; // 26.pow(3)
 
+// need to construct a LamellarWorld
+// but only one can be constructed per execution
+// so simply use this to initialize to once_cell containing
+// the world so as not to affect the timings of the actual solutions
+#[aoc(day8, part1, A_INIT_WORLD)]
+pub fn part_1(_input: &str) -> u32 {
+    WORLD.num_pes() as u32
+}
+
 #[aoc_generator(day8, part1)]
 fn parse_part1(input: &str) -> (Vec<usize>, Vec<[u16; 2]>) {
     let mut data = vec![[0_u16, 0_u16]; MAX_NUM + 1];
@@ -65,11 +74,6 @@ fn parse_part2(input: &str) -> (Vec<usize>, Vec<usize>, Vec<[u16; 3]>) {
         data[index as usize] = [left, right, z as u16];
     }
     (directions, starts, data)
-}
-
-#[aoc(day8, part1, A_INIT_WORLD)]
-pub fn part_1(_: &(Vec<usize>, Vec<[u16; 2]>)) -> u32 {
-    WORLD.num_pes() as u32
 }
 
 #[aoc(day8, part1, serial)]
