@@ -37,7 +37,7 @@ pub fn part_2_serial(data: &str) -> usize {
     for line in data.lines() {
         for (i, step) in line.split(',').enumerate() {
             let mut global_h = 0;
-            let mut label_h: u128 = 0;
+            let mut label_h: u64 = 0;
             let bytes = step.as_bytes();
             for j in 0..bytes.len() {
                 match bytes[j] {
@@ -54,7 +54,7 @@ pub fn part_2_serial(data: &str) -> usize {
                     }
                     _ => {
                         global_h = ((global_h + bytes[j] as usize) * 17) % 256;
-                        label_h = (label_h << 8) | bytes[j] as u128;
+                        label_h = (label_h << 8) | bytes[j] as u64;
                     }
                 }
             }
@@ -124,23 +124,109 @@ pub fn part_1_am(input: &std::sync::Arc<Vec<Vec<u8>>>) -> usize {
 }
 
 // because the order in which the same labels are processed need to be quaranteed
-// we can simply parallize over the steps, instead we will group the steps by level
-// and then parallelize over the label groups
-// #[AmLocalData]
-// struct Part2 {
-//     data: Arc<Vec<Vec<u8>>>,
-//     start: usize,
-//     n: usize,
-//     boxes: Arc<Vec<Mutex<HashMap<u128, (usize, u8)>>>>,
-// }
+// we can't simply parallize over the steps, instead we will group the steps by label
+// and then parallelize over the label groups, unforunately this means most the processing
+// will be done serially, limiting any benefits of parallelism
+#[AmLocalData]
+struct Part2 {
+    labels: Arc<HashMap<u64, Vec<StepOp>>>,
+    start: usize,
+    n: usize,
+    boxes: Arc<Vec<Mutex<HashMap<u64, (usize, u8)>>>>,
+}
 
-// #[local_am]
-// impl LamellarAm for Part2 {
-//     async fn exec() {}
-// }
+#[local_am]
+impl LamellarAm for Part2 {
+    async fn exec() {
+        for label in self.labels.keys().skip(self.start).step_by(self.n) {
+            self.labels
+                .get(label)
+                .unwrap()
+                .iter()
+                .for_each(|op| match op {
+                    StepOp::Equal(order, global_h, fl) => {
+                        self.boxes[*global_h]
+                            .lock()
+                            .unwrap()
+                            .entry(*label)
+                            .and_modify(|(_, lens)| *lens = *fl)
+                            .or_insert((*order, *fl));
+                    }
+                    StepOp::Minus(global_h) => {
+                        self.boxes[*global_h].lock().unwrap().remove(label);
+                    }
+                })
+        }
+    }
+}
 
-// #[aoc_generator(day15, part2, am)]
-// fn parse_input_2_am(input: &str) -> std::sync::Arc<Vec<Vec<u8>>> {}
+pub enum StepOp {
+    Equal(usize, usize, u8),
+    Minus(usize),
+}
+#[aoc_generator(day15, part2, am)]
+fn parse_input_2_am(input: &str) -> std::sync::Arc<HashMap<u64, Vec<StepOp>>> {
+    let mut steps_map = HashMap::new();
+    input.lines().for_each(|l| {
+        l.split(',').enumerate().for_each(|(i, s)| {
+            let mut label_h: u64 = 0;
+            let mut global_h = 0;
+            let bytes = s.as_bytes();
+            for j in 0..bytes.len() {
+                match bytes[j] {
+                    b'-' => {
+                        steps_map
+                            .entry(label_h)
+                            .or_insert(vec![])
+                            .push(StepOp::Minus(global_h));
+                        break;
+                    }
+                    b'=' => {
+                        steps_map
+                            .entry(label_h)
+                            .or_insert(vec![])
+                            .push(StepOp::Equal(i, global_h, bytes[j + 1] - 48));
+                        break;
+                    }
+                    _ => {
+                        global_h = ((global_h + bytes[j] as usize) * 17) % 256;
+                        label_h = (label_h << 8) | bytes[j] as u64;
+                    }
+                }
+            }
+        })
+    });
+    std::sync::Arc::new(steps_map)
+}
 
-// #[aoc(day15, part2, am)]
-// pub fn part_2_am(input: &std::sync::Arc<Vec<Vec<u8>>>) -> usize {}
+#[aoc(day15, part2, am)]
+pub fn part_2_am(input: &std::sync::Arc<HashMap<u64, Vec<StepOp>>>) -> usize {
+    let num_threads = WORLD.num_threads_per_pe();
+    let mut boxes = vec![];
+    for _ in 0..256 {
+        boxes.push(Mutex::new(HashMap::new()));
+    }
+    let boxes = std::sync::Arc::new(boxes);
+
+    (0..num_threads).for_each(|t| {
+        WORLD.exec_am_local(Part2 {
+            labels: input.clone(),
+            start: t,
+            n: num_threads,
+            boxes: boxes.clone(),
+        });
+    });
+    WORLD.wait_all();
+    boxes
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let mut vec = b.lock().unwrap().values().map(|&v| v).collect::<Vec<_>>();
+            vec.sort_unstable();
+            vec.iter()
+                .enumerate()
+                .map(|(j, (_, f))| (i + 1) * (j + 1) * *f as usize)
+                .sum::<usize>()
+        })
+        .sum::<usize>()
+}
