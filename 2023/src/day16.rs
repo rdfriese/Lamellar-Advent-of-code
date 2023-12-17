@@ -366,8 +366,9 @@ struct Part1 {
     energized: Arc<Mutex<HashSet<(usize, usize)>>>,
     num_rows: usize,
     num_cols: usize,
-    paths: Arc<RwLock<HashSet<Dir>>>,
+    paths: HashSet<Dir>,
     start_dir: Dir,
+    cnt: Arc<AtomicUsize>,
 }
 
 #[local_am]
@@ -376,159 +377,138 @@ impl LamellarAm for Part1 {
         let row_non_zeros = &self.data.0;
         let col_non_zeros = &self.data.1;
         let mut energized = HashSet::new();
-        let mut paths = self.paths.read().unwrap().clone();
+        let mut paths = self.paths.clone();
         let mut dir_vec = vec![self.start_dir];
-        let mut cur = self.start_dir;
-        while let Some(next) = cur.next(
-            &mut energized,
-            &mut paths,
-            row_non_zeros,
-            col_non_zeros,
-            self.num_rows,
-            self.num_cols,
-            &mut dir_vec,
-        ) {
-            if cur == next {
-                break;
-            }
-            cur = next;
-            for dir in dir_vec.drain(..) {
-                lamellar::world.exec_am_local(Part1 {
-                    data: self.data.clone(),
-                    energized: self.energized.clone(),
-                    num_rows: self.num_rows,
-                    num_cols: self.num_cols,
-                    paths: self.paths.clone(),
-                    start_dir: dir,
-                });
+        while let Some(mut cur) = dir_vec.pop() {
+            while let Some(next) = cur.next(
+                &mut energized,
+                &mut paths,
+                row_non_zeros,
+                col_non_zeros,
+                self.num_rows,
+                self.num_cols,
+                &mut dir_vec,
+            ) {
+                if cur == next {
+                    break;
+                }
+                cur = next;
+                if self.cnt.load(Ordering::SeqCst) < lamellar::world.num_threads_per_pe() {
+                    for dir in dir_vec.drain(..) {
+                        self.cnt.fetch_add(1, Ordering::SeqCst);
+                        lamellar::world.exec_am_local(Part1 {
+                            data: self.data.clone(),
+                            energized: self.energized.clone(),
+                            num_rows: self.num_rows,
+                            num_cols: self.num_cols,
+                            paths: paths.clone(),
+                            start_dir: dir,
+                            cnt: self.cnt.clone(),
+                        });
+                    }
+                }
             }
         }
+        // self.cnt.fetch_sub(1, Ordering::SeqCst);
         self.energized.lock().unwrap().extend(energized);
-        self.paths.write().unwrap().extend(paths);
     }
 }
 
 #[aoc(day16, part1, am)]
 pub fn part_1_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) -> usize {
     let energized = Arc::new(Mutex::new(HashSet::new()));
-    let paths = Arc::new(RwLock::new(HashSet::new()));
+    let cnt = Arc::new(AtomicUsize::new(0));
     WORLD.exec_am_local(Part1 {
         data: input.clone(),
         energized: energized.clone(),
         num_rows: input.0.len(),
         num_cols: input.1.len(),
-        paths: paths.clone(),
+        paths: HashSet::new(),
         start_dir: Dir::Right((0, 0)),
+        cnt: cnt.clone(),
     });
     WORLD.wait_all();
     let len = energized.lock().unwrap().len();
     len
 }
 
-// // because the order in which the same labels are processed need to be quaranteed
-// // we can't simply parallize over the steps, instead we will group the steps by label
-// // and then parallelize over the label groups, unforunately this means most the processing
-// // will be done serially, limiting any benefits of parallelism
-// #[AmLocalData]
-// struct Part2 {
-//     labels: Arc<HashMap<u64, Vec<StepOp>>>,
-//     start: usize,
-//     n: usize,
-//     boxes: Arc<Vec<Mutex<HashMap<u64, (usize, u8)>>>>,
-// }
+#[AmLocalData]
+struct Part2 {
+    data: Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>,
+    num_rows: usize,
+    num_cols: usize,
+    paths: HashSet<Dir>,
+    start_dir: Dir,
+    cnt: Arc<AtomicUsize>,
+}
 
-// #[local_am]
-// impl LamellarAm for Part2 {
-//     async fn exec() {
-//         for label in self.labels.keys().skip(self.start).step_by(self.n) {
-//             self.labels
-//                 .get(label)
-//                 .unwrap()
-//                 .iter()
-//                 .for_each(|op| match op {
-//                     StepOp::Equal(order, global_h, fl) => {
-//                         self.boxes[*global_h]
-//                             .lock()
-//                             .unwrap()
-//                             .entry(*label)
-//                             .and_modify(|(_, lens)| *lens = *fl)
-//                             .or_insert((*order, *fl));
-//                     }
-//                     StepOp::Minus(global_h) => {
-//                         self.boxes[*global_h].lock().unwrap().remove(label);
-//                     }
-//                 })
-//         }
-//     }
-// }
+#[local_am]
+impl LamellarAm for Part2 {
+    async fn exec() ->usize {
+        let row_non_zeros = &self.data.0;
+        let col_non_zeros = &self.data.1;
+        let mut energized = HashSet::new();
+        let mut paths = self.paths.clone();
+        let mut dir_vec = vec![self.start_dir];
+        while let Some(mut cur) = dir_vec.pop() {
+            while let Some(next) = cur.next(
+                &mut energized,
+                &mut paths,
+                row_non_zeros,
+                col_non_zeros,
+                self.num_rows,
+                self.num_cols,
+                &mut dir_vec,
+            ) {
+                if cur == next {
+                    break;
+                }
+                cur = next;
+            }
+        }
+        energized.len()
+    }
+}
 
-// pub enum StepOp {
-//     Equal(usize, usize, u8),
-//     Minus(usize),
-// }
-// #[aoc_generator(day16, part2, am)]
-// fn parse_input_2_am(input: &str) -> std::sync::Arc<HashMap<u64, Vec<StepOp>>> {
-//     let mut steps_map = HashMap::new();
-//     input.lines().for_each(|l| {
-//         l.split(',').enumerate().for_each(|(*i, s)| {
-//             let mut label_h: u64 = 0;
-//             let mut global_h = 0;
-//             let bytes = s.as_bytes();
-//             for j in 0..bytes.len() {
-//                 match bytes[*j] {
-//                     b'-' => {
-//                         steps_map
-//                             .entry(label_h)
-//                             .or_insert(vec![])
-//                             .push(StepOp::Minus(global_h));
-//                         break;
-//                     }
-//                     b'=' => {
-//                         steps_map
-//                             .entry(label_h)
-//                             .or_insert(vec![])
-//                             .push(StepOp::Equal(*i, global_h, bytes[j + 1] - 48));
-//                         break;
-//                     }
-//                     _ => {
-//                         global_h = ((global_h + bytes[*j] as usize) * 17) % 256;
-//                         label_h = (label_h << 8) | bytes[*j] as u64;
-//                     }
-//                 }
-//             }
-//         })
-//     });
-//     std::sync::Arc::new(steps_map)
-// }
-
-// #[aoc(day16, part2, am)]
-// pub fn part_2_am(input: &std::sync::Arc<HashMap<u64, Vec<StepOp>>>) -> usize {
-//     let num_threads = WORLD.num_threads_per_pe();
-//     let mut boxes = vec![];
-//     for _ in 0..256 {
-//         boxes.push(Mutex::new(HashMap::new()));
-//     }
-//     let boxes = std::sync::Arc::new(boxes);
-
-//     (0..num_threads).for_each(|t| {
-//         WORLD.exec_am_local(Part2 {
-//             labels: input.clone(),
-//             start: t,
-//             n: num_threads,
-//             boxes: boxes.clone(),
-//         });
-//     });
-//     WORLD.wait_all();
-//     boxes
-//         .iter()
-//         .enumerate()
-//         .map(|(*i, b)| {
-//             let mut vec = b.lock().unwrap().values().map(|&v| v).collect::<Vec<_>>();
-//             vec.sort_unstable();
-//             vec.iter()
-//                 .enumerate()
-//                 .map(|(j, (_, f))| (*i + 1) * (j + 1) * *f as usize)
-//                 .sum::<usize>()
-//         })
-//         .sum::<usize>()
-// }
+#[aoc(day16, part2, am)]
+pub fn part_2_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) -> usize {
+    let cnt = Arc::new(AtomicUsize::new(0));
+    let mut reqs = Vec::new();
+    for col in 0..input.1.len() {
+        reqs.push(WORLD.exec_am_local(Part2 {
+            data: input.clone(),
+            num_rows: input.0.len(),
+            num_cols: input.1.len(),
+            paths: HashSet::new(),
+            start_dir: Dir::Down((0, col)),
+            cnt: cnt.clone(),
+        }));
+        reqs.push(WORLD.exec_am_local(Part2 {
+            data: input.clone(),
+            num_rows: input.0.len(),
+            num_cols: input.1.len(),
+            paths: HashSet::new(),
+            start_dir: Dir::Up((input.0.len() - 1, col)),
+            cnt: cnt.clone(),
+        }));    
+    }
+    for row in 0..input.0.len() {
+        reqs.push(WORLD.exec_am_local(Part2 {
+            data: input.clone(),
+            num_rows: input.0.len(),
+            num_cols: input.1.len(),
+            paths: HashSet::new(),
+            start_dir: Dir::Right((row, 0)),
+            cnt: cnt.clone(),
+        }));
+        reqs.push(WORLD.exec_am_local(Part2 {
+            data: input.clone(),
+            num_rows: input.0.len(),
+            num_cols: input.1.len(),
+            paths: HashSet::new(),
+            start_dir: Dir::Left((row, input.1.len() - 1)),
+            cnt: cnt.clone(),
+        }));
+    }
+    *WORLD.block_on(futures::future::join_all(reqs)).iter().max().unwrap()
+}
