@@ -409,7 +409,6 @@ impl LamellarAm for Part1 {
                 }
             }
         }
-        // self.cnt.fetch_sub(1, Ordering::SeqCst);
         self.energized.lock().unwrap().extend(energized);
     }
 }
