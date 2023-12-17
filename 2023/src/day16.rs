@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 use crate::WORLD;
 use aoc_runner_derive::{aoc, aoc_generator};
@@ -16,7 +16,7 @@ pub fn part_1(_input: &str) -> u32 {
     WORLD.num_pes() as u32
 }
 #[aoc_generator(day16)]
-fn parse(input: &str) -> (Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>) {
+fn parse(input: &str) -> Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)> {
     let mut row_non_zeros = vec![];
     let mut col_non_zeros = vec![];
     let mut lines = input.lines().enumerate();
@@ -41,7 +41,7 @@ fn parse(input: &str) -> (Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>) {
             }
         }
     }
-    (row_non_zeros, col_non_zeros)
+    Arc::new((row_non_zeros, col_non_zeros))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -293,7 +293,7 @@ fn get_energized_from_start(
 }
 
 #[aoc(day16, part1, serial)]
-pub fn part_1_serial(data: &(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)) -> usize {
+pub fn part_1_serial(data: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) -> usize {
     let row_non_zeros = &data.0;
     let col_non_zeros = &data.1;
     get_energized_from_start(
@@ -306,7 +306,7 @@ pub fn part_1_serial(data: &(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)) -> u
 }
 
 #[aoc(day16, part2, serial)]
-pub fn part_2_serial(data: &(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)) -> usize {
+pub fn part_2_serial(data: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) -> usize {
     let row_non_zeros = &data.0;
     let col_non_zeros = &data.1;
     let num_rows = data.0.len();
@@ -360,97 +360,70 @@ pub fn part_2_serial(data: &(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)) -> u
     max
 }
 
-// #[aoc(day16, part2, serial)]
-// pub fn part_2_serial(data: &str) -> usize {
-//     let mut boxes = vec![HashMap::new(); 256];
-//     for line in data.lines() {
-//         for (*i, step) in line.split(',').enumerate() {
-//             let mut global_h = 0;
-//             let mut label_h: u64 = 0;
-//             let bytes = step.as_bytes();
-//             for j in 0..bytes.len() {
-//                 match bytes[*j] {
-//                     b'-' => {
-//                         boxes[global_h].remove(&label_h);
-//                         break;
-//                     }
-//                     b'=' => {
-//                         boxes[global_h]
-//                             .entry(label_h)
-//                             .and_modify(|(_, lens)| *lens = bytes[j + 1] - 48)
-//                             .or_insert((*i, bytes[j + 1] - 48));
-//                         break;
-//                     }
-//                     _ => {
-//                         global_h = ((global_h + bytes[*j] as usize) * 17) % 256;
-//                         label_h = (label_h << 8) | bytes[*j] as u64;
-//                     }
-//                 }
-//             }
-//         }
-//     }
+#[AmLocalData]
+struct Part1 {
+    data: Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>,
+    energized: Arc<Mutex<HashSet<(usize, usize)>>>,
+    num_rows: usize,
+    num_cols: usize,
+    paths: Arc<RwLock<HashSet<Dir>>>,
+    start_dir: Dir,
+}
 
-//     boxes
-//         .drain(..)
-//         .enumerate()
-//         .map(|(*i, b)| {
-//             let mut vec = b.into_values().collect::<Vec<_>>();
-//             vec.sort_unstable();
-//             vec.iter()
-//                 .enumerate()
-//                 .map(|(j, (_, f))| (*i + 1) * (j + 1) * *f as usize)
-//                 .sum::<usize>()
-//         })
-//         .sum::<usize>()
-// }
+#[local_am]
+impl LamellarAm for Part1 {
+    async fn exec() {
+        let row_non_zeros = &self.data.0;
+        let col_non_zeros = &self.data.1;
+        let mut energized = HashSet::new();
+        let mut paths = self.paths.read().unwrap().clone();
+        let mut dir_vec = vec![self.start_dir];
+        let mut cur = self.start_dir;
+        while let Some(next) = cur.next(
+            &mut energized,
+            &mut paths,
+            row_non_zeros,
+            col_non_zeros,
+            self.num_rows,
+            self.num_cols,
+            &mut dir_vec,
+        ) {
+            if cur == next {
+                break;
+            }
+            cur = next;
+            for dir in dir_vec.drain(..) {
+                lamellar::world.exec_am_local(Part1 {
+                    data: self.data.clone(),
+                    energized: self.energized.clone(),
+                    num_rows: self.num_rows,
+                    num_cols: self.num_cols,
+                    paths: self.paths.clone(),
+                    start_dir: dir,
+                });
+            }
+        }
+        self.energized.lock().unwrap().extend(energized);
+        self.paths.write().unwrap().extend(paths);
+    }
+}
 
-// #[AmLocalData]
-// struct Part1 {
-//     data: Arc<Vec<Vec<u8>>>,
-//     start: usize,
-//     n: usize,
-//     sum: Arc<AtomicUsize>,
-// }
-
-// #[local_am]
-// impl LamellarAm for Part1 {
-//     async fn exec() {
-//         self.sum.fetch_add(
-//             self.data[self.start..]
-//                 .iter()
-//                 .step_by(self.n)
-//                 .map(|s| s.iter().fold(0, |acc, &b| ((acc + b as usize) * 17) % 256))
-//                 .sum::<usize>(),
-//             Ordering::SeqCst,
-//         );
-//     }
-// }
-
-// #[aoc_generator(day16, part1, am)]
-// fn parse_input_1_am(input: &str) -> std::sync::Arc<Vec<Vec<u8>>> {
-//     let mut steps = vec![];
-//     input.lines().for_each(|l| {
-//         l.split(',').for_each(|s| steps.push(s.as_bytes().to_vec()));
-//     });
-//     std::sync::Arc::new(steps)
-// }
-
-// #[aoc(day16, part1, am)]
-// pub fn part_1_am(input: &std::sync::Arc<Vec<Vec<u8>>>) -> usize {
-//     let num_threads = WORLD.num_threads_per_pe();
-//     let sum = Arc::new(AtomicUsize::new(0));
-
-//     (0..num_threads).for_each(|t| {
-//         WORLD.exec_am_local(Part1 {
-//             data: input.clone(),
-//             start: t,
-//             n: num_threads,
-//             sum: sum.clone(),
-//         });
-//     });
-//     WORLD.wait_all();
-//     sum.load(Ordering::SeqCst)
-// }
+#[aoc(day16, part1, am)]
+pub fn part_1_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) -> usize {
+    let energized = Arc::new(Mutex::new(HashSet::new()));
+    let paths = Arc::new(RwLock::new(HashSet::new()));
+    WORLD.exec_am_local(Part1 {
+        data: input.clone(),
+        energized: energized.clone(),
+        num_rows: input.0.len(),
+        num_cols: input.1.len(),
+        paths: paths.clone(),
+        start_dir: Dir::Right((0, 0)),
+    });
+    WORLD.wait_all();
+    let len = energized.lock().unwrap().len();
+    len
+}
 
 // // because the order in which the same labels are processed need to be quaranteed
 // // we can't simply parallize over the steps, instead we will group the steps by label
