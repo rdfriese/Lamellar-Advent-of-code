@@ -1,4 +1,4 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -132,7 +132,8 @@ pub fn part_1_serial(
     (data, upper_h, upper_w): &(Arc<Vec<(Dir, usize, Trench)>>, usize, usize),
 ) -> isize {
     let mut sum = 0;
-    let mut lines = vec![Vec::new(); *upper_h + 1];
+    let mut lines = BTreeMap::new();
+    let mut lines2 = BTreeMap::new();
     let mut cur_i = 0isize;
     let mut cur_j = 0;
     // let mut min_i = 0;
@@ -140,40 +141,66 @@ pub fn part_1_serial(
     for (dir, num, __) in data.iter() {
         // println!("{lines:?}");
         // println!("{dir:?}");
+        let num = *num as isize;
         match dir {
             Dir::Up => {
-                for i in cur_i as usize - num..cur_i as usize {
-                    add_entry(&mut lines[i], Entry::Edge(cur_j));
+                for i in cur_i as isize - num..cur_i as isize {
+                    add_entry(
+                        &mut lines.entry(i).or_insert(Vec::new()),
+                        Entry::Edge(cur_j),
+                    );
+                    lines2
+                        .entry(i)
+                        .or_insert(Vec::new())
+                        .push(Entry::Edge(cur_j));
                 }
-                cur_i -= *num as isize;
+                cur_i -= num as isize;
             }
             Dir::Down => {
-                for i in cur_i as usize..cur_i as usize + num {
-                    add_entry(&mut lines[i], Entry::Edge(cur_j));
+                for i in cur_i as isize..cur_i as isize + num {
+                    add_entry(
+                        &mut lines.entry(i).or_insert(Vec::new()),
+                        Entry::Edge(cur_j),
+                    );
+                    lines2
+                        .entry(i)
+                        .or_insert(Vec::new())
+                        .push(Entry::Edge(cur_j));
                 }
-                cur_i += *num as isize;
+                cur_i += num as isize;
             }
             Dir::Left => {
                 add_entry(
-                    &mut lines[cur_i as usize],
-                    Entry::Line(cur_j - *num as isize, cur_j),
+                    &mut lines.entry(cur_i as isize).or_insert(Vec::new()),
+                    Entry::Line(cur_j - num as isize, cur_j),
                 );
-                cur_j -= *num as isize;
+                lines2
+                    .entry(cur_i as isize)
+                    .or_insert(Vec::new())
+                    .push(Entry::Line(cur_j - num as isize, cur_j));
+                cur_j -= num as isize;
             }
             Dir::Right => {
                 add_entry(
-                    &mut lines[cur_i as usize],
-                    Entry::Line(cur_j, cur_j + *num as isize),
+                    &mut lines.entry(cur_i as isize).or_insert(Vec::new()),
+                    Entry::Line(cur_j, cur_j + num as isize),
                 );
-                cur_j += *num as isize;
+                lines2
+                    .entry(cur_i as isize)
+                    .or_insert(Vec::new())
+                    .push(Entry::Line(cur_j, cur_j + num as isize));
+                cur_j += num as isize;
             }
         }
         // println!("{lines:?}");
         // println!("");
     }
-    for line in lines.iter_mut() {
+    for (i, line) in lines.iter_mut() {
         line.sort();
-        println!("{:?}", line);
+        println!("{i} {:?}", line);
+        let mut line2 = lines2.get(i).unwrap().clone();
+        line2.sort();
+        println!("{i} {:?}", line2);
         // for window in lines.windows(2) {
         let mut i = 0;
         let mut tempsum = 0;
