@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use crate::WORLD;
 use aoc_runner_derive::{aoc, aoc_generator};
@@ -438,12 +438,11 @@ struct Part2 {
     num_cols: usize,
     paths: HashSet<Dir>,
     start_dir: Dir,
-    cnt: Arc<AtomicUsize>,
 }
 
 #[local_am]
 impl LamellarAm for Part2 {
-    async fn exec() ->usize {
+    async fn exec() -> usize {
         let row_non_zeros = &self.data.0;
         let col_non_zeros = &self.data.1;
         let mut energized = HashSet::new();
@@ -471,7 +470,6 @@ impl LamellarAm for Part2 {
 
 #[aoc(day16, part2, am)]
 pub fn part_2_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) -> usize {
-    let cnt = Arc::new(AtomicUsize::new(0));
     let mut reqs = Vec::new();
     for col in 0..input.1.len() {
         reqs.push(WORLD.exec_am_local(Part2 {
@@ -480,7 +478,6 @@ pub fn part_2_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) ->
             num_cols: input.1.len(),
             paths: HashSet::new(),
             start_dir: Dir::Down((0, col)),
-            cnt: cnt.clone(),
         }));
         reqs.push(WORLD.exec_am_local(Part2 {
             data: input.clone(),
@@ -488,8 +485,7 @@ pub fn part_2_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) ->
             num_cols: input.1.len(),
             paths: HashSet::new(),
             start_dir: Dir::Up((input.0.len() - 1, col)),
-            cnt: cnt.clone(),
-        }));    
+        }));
     }
     for row in 0..input.0.len() {
         reqs.push(WORLD.exec_am_local(Part2 {
@@ -498,7 +494,6 @@ pub fn part_2_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) ->
             num_cols: input.1.len(),
             paths: HashSet::new(),
             start_dir: Dir::Right((row, 0)),
-            cnt: cnt.clone(),
         }));
         reqs.push(WORLD.exec_am_local(Part2 {
             data: input.clone(),
@@ -506,8 +501,11 @@ pub fn part_2_am(input: &Arc<(Vec<Vec<(u8, usize)>>, Vec<Vec<(u8, usize)>>)>) ->
             num_cols: input.1.len(),
             paths: HashSet::new(),
             start_dir: Dir::Left((row, input.1.len() - 1)),
-            cnt: cnt.clone(),
         }));
     }
-    *WORLD.block_on(futures::future::join_all(reqs)).iter().max().unwrap()
+    *WORLD
+        .block_on(futures::future::join_all(reqs))
+        .iter()
+        .max()
+        .unwrap()
 }

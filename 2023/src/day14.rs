@@ -45,6 +45,7 @@ pub fn part_1_serial(data: &str) -> usize {
     sum
 }
 
+#[allow(dead_code)]
 fn print_data(data: &[Vec<u8>]) {
     for line in data {
         println!("{:?}", std::str::from_utf8(&line));
